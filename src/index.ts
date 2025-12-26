@@ -984,7 +984,7 @@ function getStoreIcon(store: StoreType): string {
 function getStoreLinks(game: Game): string {
   switch (game.store) {
     case 'epic':
-      return `[Website](${game.url}) • [Launcher](${game.url.split('/p/')[0] + '/app/' + game.id})`;
+      return `[Website](${game.url}) • [Launcher](https://epicfreegames.net/r/app/${game.id})`;
     case 'steam':
       return `[Website](${game.url}) • [Client](steam://store/${game.url.match(/\/app\/(\d+)/)?.[1]})`;
     case 'gog':
