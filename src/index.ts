@@ -5,6 +5,7 @@
 interface Env {
   POSTED_GAMES: KVNamespace;
   DISCORD_WEBHOOK_URL: string;
+  DISCORD_PUBLIC_KEY: string;
 }
 
 interface Game {
@@ -36,22 +37,41 @@ interface DiscordEmbed {
   };
 }
 
+import { verifyKey } from 'discord-interactions';
+
 export default {
+  async fetch(request: Request, env: Env): Promise<Response> {
+    const signature = request.headers.get("X-Signature-Ed25519");
+    const timestamp = request.headers.get("X-Signature-Timestamp");
+    const body = await request.text();
+
+    const isValid = verifyKey(
+      body,
+      signature,
+      timestamp,
+      env.DISCORD_PUBLIC_KEY
+    );
+
+    if (!isValid) {
+      return new Response("invalid request signature", { status: 401 });
+    }
+
+    const json = JSON.parse(body);
+
+    // PING → PONG
+    if (json.type === 1) {
+      return new Response(JSON.stringify({ type: 1 }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    await checkAndPostFreeGames(env);
+
+    return new Response("ok");
+  },
+
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
     ctx.waitUntil(checkAndPostFreeGames(env));
   },
-
-  async fetch(request: Request, env: Env): Promise<Response> {
-    if (request.method === 'POST') {
-      const url = new URL(request.url);
-      if (url.pathname === '/check') {
-        await checkAndPostFreeGames(env);
-        return new Response('Check durchgeführt', { status: 200 });
-      }
-    }
-    
-    return new Response('Epic Games Free Games Bot läuft', { status: 200 });
-  }
 };
 
 /**
