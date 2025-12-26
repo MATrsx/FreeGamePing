@@ -45,10 +45,10 @@ export default {
     ctx.waitUntil(checkAndPostFreeGames(env));
   },
 
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     // Discord Interactions Endpoint
     if (request.method === 'POST' && new URL(request.url).pathname === '/interactions') {
-      return handleDiscordInteraction(request, env);
+      return handleDiscordInteraction(request, env, ctx);
     }
     
     // Manueller Check Endpoint
@@ -64,7 +64,7 @@ export default {
 /**
  * Verarbeitet Discord Interactions (Slash Commands)
  */
-async function handleDiscordInteraction(request: Request, env: Env): Promise<Response> {
+async function handleDiscordInteraction(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
   const signature = request.headers.get('X-Signature-Ed25519');
   const timestamp = request.headers.get('X-Signature-Timestamp');
   const body = await request.text();
@@ -90,7 +90,7 @@ async function handleDiscordInteraction(request: Request, env: Env): Promise<Res
   
   // Handle Slash Commands
   if (interaction.type === InteractionType.APPLICATION_COMMAND) {
-    return handleCommand(interaction, env);
+    return handleCommand(interaction, env, ctx);
   }
   
   return new Response('Unknown interaction type', { status: 400 });
@@ -99,7 +99,7 @@ async function handleDiscordInteraction(request: Request, env: Env): Promise<Res
 /**
  * Verarbeitet Slash Commands
  */
-async function handleCommand(interaction: any, env: Env): Promise<Response> {
+async function handleCommand(interaction: any, env: Env, ctx: ExecutionContext): Promise<Response> {
   const { name, options } = interaction.data;
   const guildId = interaction.guild_id;
   
@@ -130,7 +130,7 @@ async function handleCommand(interaction: any, env: Env): Promise<Response> {
       // Nur für Testing - prüft sofort auf neue Spiele
       responseContent = '🔍 Prüfe auf neue Spiele... (kann bis zu 30 Sekunden dauern)';
       // Führe Check im Hintergrund aus
-      checkAndPostFreeGames(env).catch(console.error);
+      ctx.waitUntil(checkAndPostFreeGames(env).catch(console.error));
       break;
       
     default:
@@ -178,11 +178,12 @@ async function checkAndPostFreeGames(env: Env): Promise<void> {
         const embed = createEmbed(game);
         
         // Poste in alle konfigurierten Channels
-        for (const guild of guilds) {
-          if (guild.enabled) {
-            await sendToChannel(env, guild.channelId, embed);
-          }
-        }
+        await Promise.all(
+          guilds
+            .filter(g => g.enabled)
+            .map(g => sendToChannel(env, g.channelId, embed))
+        );
+
         
         postedGames.push(game.id);
         newGamesCount++;
@@ -279,13 +280,15 @@ function parseFreeGames(data: any): Game[] {
         }
       }
       
+      const slug = game.productSlug || game.urlSlug;
+      if (!slug) continue; // Spiel überspringen
       freeGames.push({
         id: game.id,
         title: game.title,
         description: game.description || 'Keine Beschreibung verfügbar',
         startDate: offer.startDate,
         endDate: offer.endDate,
-        url: `https://store.epicgames.com/de/p/${game.productSlug || game.urlSlug || ''}`,
+        url: `https://store.epicgames.com/de/p/${slug}`,
         image: imageUrl
       });
     }
