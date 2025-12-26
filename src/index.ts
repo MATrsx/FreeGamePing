@@ -843,7 +843,7 @@ function mergeEpicGames(gamerPowerGames: Game[], officialGames: Game[]): Game[] 
     // Enhance official data with GamerPower data
     if (gp) {
       if (gp.instructions && gp.instructions !== 'N/A') {
-        official.instructions = gp.instructions;
+        official.instructions = gp.instructions.replace('"Get Giveaway" button', '"Epic Games Store" link').trim();
       }
       
       if (gp.price && gp.price.original > 0 && (!official.price || official.price.original === 0)) {
@@ -952,7 +952,7 @@ function getStoreEmoji(store: StoreType): string {
 function getStoreIconUrl(store: StoreType): string {
   const icons: Record<StoreType, string> = {
     epic: 'https://cdn.brandfetch.io/idjxHPThVp/w/800/h/929/theme/dark/logo.png?c=1bxid64Mup7aczewSAYMX&t=1667655482104',
-    steam: 'https://images.seeklogo.com/logo-png/27/1/steam-logo-png_seeklogo-270306.png',
+    steam: 'https://cdn.brandfetch.io/idMpZmhn_O/w/400/h/400/theme/dark/icon.jpeg?c=1bxid64Mup7aczewSAYMX&t=1726566655121',
     gog: 'https://cdn.brandfetch.io/idKvjVxYV6/w/128/h/128/theme/dark/logo.png?c=1bxid64Mup7aczewSAYMX&t=1761868104778',
     itchio: 'https://cdn.brandfetch.io/idHwxBm5XT/w/316/h/316/theme/dark/icon.png?c=1bxid64Mup7aczewSAYMX&t=1765065158087'
   };
