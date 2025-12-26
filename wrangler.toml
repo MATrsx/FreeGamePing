@@ -1,0 +1,22 @@
+name = "epic-games-bot"
+main = "src/index.js"
+compatibility_date = "2024-12-01"
+
+# KV Namespace für gespeicherte Spiele
+kv_namespaces = [
+  { binding = "POSTED_GAMES", id = "0b9bb022854d4dfda1e014c7afee79e8", preview_id = "b90d744975f24fe9ac7c1274ac3911ca" }
+]
+
+# Cron Trigger: Prüft stündlich auf neue Spiele
+[triggers]
+crons = ["0 * * * *"]  # Jede Stunde zur vollen Stunde
+
+# Umgebungsvariablen (füge diese über Cloudflare Dashboard oder wrangler secret hinzu)
+# DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1454095656862879855/2cuYG6ChU1r75BchQHfj_x97xsv96hWaFs7BLQwPJ334uq8ZNoQL568DJEWehNGomB0w"
+
+# Für verschiedene Umgebungen
+[env.production]
+vars = { ENVIRONMENT = "production" }
+
+[env.staging]
+vars = { ENVIRONMENT = "staging" }

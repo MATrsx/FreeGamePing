@@ -9,7 +9,13 @@
 	"compatibility_date": "2025-12-25",
 	"observability": {
 		"enabled": true
-	}
+	},
+	"kv_namespaces": [
+		{
+			"binding": "POSTED_GAMES",
+			"id": "0b9bb022854d4dfda1e014c7afee79e8"
+		}
+	]
 	/**
 	 * Smart Placement
 	 * https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement
