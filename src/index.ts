@@ -356,48 +356,134 @@ async function handleCommand(interaction: any, env: Env, ctx: ExecutionContext):
   const config = await getGuildConfig(env, guildId);
   const lang = config?.language || 'en';
   const t = translations[lang];
+
+  // Commands that require setup
+  const requiresSetup = ['status', 'check', 'stores', 'language', 'role', 'separate-threads', 'thread'];
   
   let responseContent = '';
   let deferred = false;
   
+  if (requiresSetup.includes(name) && (!config || !config.enabled)) {
+    return new Response(JSON.stringify({
+      type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+      data: {
+        content: "❌ Der Bot ist auf diesem Server nicht aktiviert. Nutze zuerst `/setup`.",
+        flags: 64
+      }
+    }), {
+      headers: { "Content-Type": "application/json" }
+    });
+  }
+
   switch (name) {
-    case 'setup':
+    case 'setup': {
       const channelOption = options?.find((o: any) => o.name === 'channel');
       const threadOption = options?.find((o: any) => o.name === 'thread');
       const channelId = channelOption?.value || interaction.channel_id;
       const threadId = threadOption?.value;
-      
+    
       await saveGuildConfig(env, guildId, channelId, threadId);
-      
-      if (threadId) {
-        responseContent = `${t.setup_thread_success} <#${threadId}>`;
-      } else {
-        responseContent = `${t.setup_success} <#${channelId}>`;
-      }
-      break;
+    
+      const embed = {
+        title: "🚀 " + t.setup_success,
+        description: threadId
+          ? `${t.setup_thread_success} <#${threadId}>`
+          : `${t.setup_success} <#${channelId}>`,
+        color: 0x00ff99,
+        fields: [
+          {
+            name: "📦 " + t.status_stores,
+            value: "`epic`",
+            inline: true
+          },
+          {
+            name: "🌍 " + t.status_language,
+            value: "`" + (config?.language ?? "en") + "`",
+            inline: true
+          },
+          {
+            name: "🧵 Threads",
+            value: threadId ? `<#${threadId}>` : "—",
+            inline: true
+          }
+        ],
+        footer: { text: "Free Games Bot" },
+        timestamp: new Date().toISOString()
+      };
+    
+      return new Response(JSON.stringify({
+        type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+        data: { embeds: [embed], flags: 64 }
+      }), { headers: { "Content-Type": "application/json" } });
+    }
       
     case 'disable':
       await disableGuild(env, guildId);
       responseContent = t.disabled;
       break;
-      
-    case 'status':
-      const statusConfig = await getGuildConfig(env, guildId);
-      if (statusConfig && statusConfig.enabled) {
-        const channelMention = statusConfig.threadId 
-          ? `<#${statusConfig.threadId}>` 
-          : `<#${statusConfig.channelId}>`;
-        responseContent = `${t.status_active} ${channelMention}\n\n`;
-        responseContent += `${t.status_language}: ${statusConfig.language}\n`;
-        responseContent += `${t.status_stores}: ${statusConfig.stores.map(s => storeEmojis[s] + ' ' + storeNames[s]).join(', ')}\n`;
-        
-        if (statusConfig.mentionRoles.length > 0) {
-          responseContent += `${t.status_roles}: ${statusConfig.mentionRoles.map(r => `<@&${r}>`).join(', ')}`;
-        }
-      } else {
-        responseContent = t.status_inactive;
+    
+    case 'status': {
+      if (!config || !config.enabled) {
+        const embed = {
+          title: "❌ " + t.status_inactive,
+          description: t.status_inactive,
+          color: 0xff5555,
+          footer: { text: "Free Games Bot" }
+        };
+    
+        return new Response(JSON.stringify({
+          type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+          data: { embeds: [embed], flags: 64 }
+        }), { headers: { "Content-Type": "application/json" } });
       }
-      break;
+    
+      const channelMention = config.threadId
+        ? `<#${config.threadId}>`
+        : `<#${config.channelId}>`;
+    
+      const embed = {
+        title: "📊 " + t.status_active,
+        description: `${t.status_active} ${channelMention}`,
+        color: 0x0099ff,
+        fields: [
+          {
+            name: "🌍 " + t.status_language,
+            value: "`" + config.language + "`",
+            inline: true
+          },
+          {
+            name: "📦 " + t.status_stores,
+            value: config.stores
+              .map(s => `${storeEmojis[s]} ${storeNames[s]}`)
+              .join("\n"),
+            inline: true
+          },
+          {
+            name: "👥 " + t.status_roles,
+            value: config.mentionRoles.length > 0
+              ? config.mentionRoles.map(r => `<@&${r}>`).join(", ")
+              : "—",
+            inline: false
+          },
+          {
+            name: "🧵 Threads",
+            value: config.separateThreads
+              ? Object.entries(config.storeThreads)
+                  .map(([store, thread]) => `${storeEmojis[store as StoreType]} <#${thread}>`)
+                  .join("\n") || "—"
+              : "—",
+            inline: false
+          }
+        ],
+        footer: { text: "Free Games Bot" },
+        timestamp: new Date().toISOString()
+      };
+    
+      return new Response(JSON.stringify({
+        type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+        data: { embeds: [embed], flags: 64 }
+      }), { headers: { "Content-Type": "application/json" } });
+    }
       
     case 'language':
       const newLang = options?.[0]?.value as Language;
@@ -438,15 +524,15 @@ async function handleCommand(interaction: any, env: Env, ctx: ExecutionContext):
       break;
       
     case 'check':
-      // Defer response for long-running operations
       deferred = true;
+    
       ctx.waitUntil(
         (async () => {
           await checkAndPostFreeGames(env);
-          // Update original response
-          await updateInteractionResponse(env, interaction.token, t.check_running + ' ✅');
+          await updateInteractionResponse(env, interaction.token, "🔍 Prüfung abgeschlossen! Neue Spiele wurden gepostet, falls verfügbar.");
         })()
       );
+    
       responseContent = t.check_running;
       break;
       
