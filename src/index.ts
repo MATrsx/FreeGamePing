@@ -910,7 +910,7 @@ function createEmbed(game: Game, t: any, lang: Language): any {
   const endTimestamp = Math.floor(new Date(game.endDate).getTime() / 1000);
   
   const embed: any = {
-    title: `${getStoreIcon(game.store)} ${game.title} - ${t.free_title}`,
+    title: `🎮 ${game.title} - ${t.free_title}`,
     description: game.description.substring(0, 500) + (game.description.length > 500 ? '...' : ''),
     color: storeColors[game.store],
     url: game.url,
@@ -973,10 +973,10 @@ function createEmbed(game: Game, t: any, lang: Language): any {
 
 function getStoreIcon(store: StoreType): string {
   const icons: Record<StoreType, string> = {
-    epic: 'https://upload.wikimedia.org/wikipedia/commons/5/58/Epic_Games_Store_logo_2023_vertical_white.svg',
-    steam: 'https://upload.wikimedia.org/wikipedia/commons/8/83/Steam_icon_logo.svg',
-    gog: 'https://upload.wikimedia.org/wikipedia/commons/2/2e/GOG.com_logo.svg',
-    ubisoft: 'https://upload.wikimedia.org/wikipedia/commons/7/78/Ubisoft_logo.svg'
+    epic: 'https://cdn.brandfetch.io/idjxHPThVp/w/800/h/929/theme/dark/logo.png?c=1bxid64Mup7aczewSAYMX&t=1667655482104',
+    steam: 'https://images.seeklogo.com/logo-png/27/1/steam-logo-png_seeklogo-270306.png',
+    gog: 'https://cdn.brandfetch.io/idKvjVxYV6/w/128/h/128/theme/dark/logo.png?c=1bxid64Mup7aczewSAYMX&t=1761868104778',
+    ubisoft: 'https://cdn.brandfetch.io/idtVsonT9X/w/800/h/831/theme/dark/symbol.png?c=1bxid64Mup7aczewSAYMX&t=1717149829878'
   };
   return icons[store];
 }
