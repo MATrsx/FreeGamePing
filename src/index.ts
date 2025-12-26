@@ -826,28 +826,55 @@ function parseEpicGamesOfficial(data: any): Game[] {
 }
 
 function mergeEpicGames(gamerPowerGames: Game[], officialGames: Game[]): Game[] {
-  const merged: Game[] = [...officialGames];
-  const officialIds = new Set(officialGames.map(g => g.title.toLowerCase()));
+  const merged: Game[] = [];
+  const processedTitles = new Set<string>();
   
-  for (const game of gamerPowerGames) {
-    if (!officialIds.has(game.title.toLowerCase())) {
-      merged.push(game);
-    }
-  }
-  
-  for (const official of merged) {
+  // Prioritize official Epic Games API data
+  for (const official of officialGames) {
+    const titleKey = official.title.toLowerCase().trim();
+    
+    // Find matching GamerPower game
     const gp = gamerPowerGames.find(g => 
-      g.title.toLowerCase() === official.title.toLowerCase()
+      g.title.toLowerCase().trim() === titleKey ||
+      g.title.toLowerCase().includes(titleKey) ||
+      titleKey.includes(g.title.toLowerCase().trim())
     );
     
+    // Enhance official data with GamerPower data
     if (gp) {
-      if (gp.instructions && !official.instructions) {
+      if (gp.instructions && gp.instructions !== 'N/A') {
         official.instructions = gp.instructions;
       }
       
-      if (gp.price && (!official.price || official.price.original === 0)) {
+      if (gp.price && gp.price.original > 0 && (!official.price || official.price.original === 0)) {
         official.price = gp.price;
       }
+      
+      processedTitles.add(gp.title.toLowerCase().trim());
+    }
+    
+    merged.push(official);
+    processedTitles.add(titleKey);
+  }
+  
+  // Add GamerPower games that weren't in official API
+  for (const game of gamerPowerGames) {
+    const titleKey = game.title.toLowerCase().trim();
+    
+    // Check if already processed
+    let alreadyExists = false;
+    for (const processedTitle of processedTitles) {
+      if (titleKey === processedTitle || 
+          titleKey.includes(processedTitle) || 
+          processedTitle.includes(titleKey)) {
+        alreadyExists = true;
+        break;
+      }
+    }
+    
+    if (!alreadyExists) {
+      merged.push(game);
+      processedTitles.add(titleKey);
     }
   }
   
