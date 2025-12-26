@@ -910,7 +910,7 @@ function createEmbed(game: Game, t: any, lang: Language): any {
   const endTimestamp = Math.floor(new Date(game.endDate).getTime() / 1000);
   
   const embed: any = {
-    title: `🎮 ${game.title} - ${t.free_title}`,
+    title: `🎁 ${game.title} - ${t.free_title}`,
     description: game.description.substring(0, 500) + (game.description.length > 500 ? '...' : ''),
     color: storeColors[game.store],
     url: game.url,
