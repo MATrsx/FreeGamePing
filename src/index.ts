@@ -1,11 +1,22 @@
 /**
  * Epic Games Free Games Bot für Cloudflare Workers (TypeScript)
+ * Mit Discord Bot Integration und Slash Commands
  */
+
+import { verifyKey } from 'discord-interactions';
 
 interface Env {
   POSTED_GAMES: KVNamespace;
-  DISCORD_WEBHOOK_URL: string;
+  GUILD_CONFIGS: KVNamespace;
   DISCORD_PUBLIC_KEY: string;
+  DISCORD_BOT_TOKEN: string;
+  DISCORD_APPLICATION_ID: string;
+}
+
+interface GuildConfig {
+  guildId: string;
+  channelId: string;
+  enabled: boolean;
 }
 
 interface Game {
@@ -18,69 +29,124 @@ interface Game {
   image: string | null;
 }
 
-interface DiscordEmbed {
-  title: string;
-  description: string;
-  color: number;
-  url: string;
-  fields: Array<{
-    name: string;
-    value: string;
-    inline: boolean;
-  }>;
-  footer: {
-    text: string;
-  };
-  timestamp: string;
-  image?: {
-    url: string;
-  };
-}
+// Discord Interaction Types
+const InteractionType = {
+  PING: 1,
+  APPLICATION_COMMAND: 2,
+};
 
-import { verifyKey } from 'discord-interactions';
+const InteractionResponseType = {
+  PONG: 1,
+  CHANNEL_MESSAGE_WITH_SOURCE: 4,
+};
 
 export default {
-  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    const signature = request.headers.get("X-Signature-Ed25519");
-    const timestamp = request.headers.get("X-Signature-Timestamp");
-    const body = await request.text();
-
-    const isValid = verifyKey(body, signature, timestamp, env.DISCORD_PUBLIC_KEY);
-    if (!isValid) return new Response("invalid request signature", { status: 401 });
-
-    const json = JSON.parse(body);
-
-    // PING → PONG
-    if (json.type === 1) {
-      return new Response(JSON.stringify({ type: 1 }), {
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-
-    // Slash Command
-    if (json.type === 2) {
-      // Hintergrundarbeit starten
-      ctx.waitUntil(checkAndPostFreeGames(env));
-
-      // Sofortige Antwort an Discord
-      return new Response(JSON.stringify({
-        type: 4,
-        data: {
-          content: "🔍 Ich prüfe jetzt die kostenlosen Spiele!"
-        }
-      }), {
-        headers: { "Content-Type": "application/json" }
-      });
-    }
-
-    return new Response("ok");
-  },
-
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
     ctx.waitUntil(checkAndPostFreeGames(env));
+  },
+
+  async fetch(request: Request, env: Env): Promise<Response> {
+    // Discord Interactions Endpoint
+    if (request.method === 'POST' && new URL(request.url).pathname === '/interactions') {
+      return handleDiscordInteraction(request, env);
+    }
+    
+    // Manueller Check Endpoint
+    if (request.method === 'POST' && new URL(request.url).pathname === '/check') {
+      await checkAndPostFreeGames(env);
+      return new Response('Check durchgeführt', { status: 200 });
+    }
+    
+    return new Response('Epic Games Bot läuft! 🎮', { status: 200 });
   }
 };
 
+/**
+ * Verarbeitet Discord Interactions (Slash Commands)
+ */
+async function handleDiscordInteraction(request: Request, env: Env): Promise<Response> {
+  const signature = request.headers.get('X-Signature-Ed25519');
+  const timestamp = request.headers.get('X-Signature-Timestamp');
+  const body = await request.text();
+  
+  // Verify Discord signature
+  if (!signature || !timestamp) {
+    return new Response('Invalid request signature', { status: 401 });
+  }
+  
+  const isValid = verifyKey(body, signature, timestamp, env.DISCORD_PUBLIC_KEY);
+  if (!isValid) {
+    return new Response('Invalid request signature', { status: 401 });
+  }
+  
+  const interaction = JSON.parse(body);
+  
+  // Respond to Discord PING
+  if (interaction.type === InteractionType.PING) {
+    return new Response(JSON.stringify({ type: InteractionResponseType.PONG }), {
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+  
+  // Handle Slash Commands
+  if (interaction.type === InteractionType.APPLICATION_COMMAND) {
+    return handleCommand(interaction, env);
+  }
+  
+  return new Response('Unknown interaction type', { status: 400 });
+}
+
+/**
+ * Verarbeitet Slash Commands
+ */
+async function handleCommand(interaction: any, env: Env): Promise<Response> {
+  const { name, options } = interaction.data;
+  const guildId = interaction.guild_id;
+  
+  let responseContent = '';
+  
+  switch (name) {
+    case 'setup':
+      const channelId = options?.[0]?.value || interaction.channel_id;
+      await saveGuildConfig(env, guildId, channelId);
+      responseContent = `✅ Bot eingerichtet! Kostenlose Spiele werden in <#${channelId}> gepostet.`;
+      break;
+      
+    case 'disable':
+      await disableGuild(env, guildId);
+      responseContent = '❌ Bot deaktiviert. Nutze `/setup` um ihn wieder zu aktivieren.';
+      break;
+      
+    case 'status':
+      const config = await getGuildConfig(env, guildId);
+      if (config && config.enabled) {
+        responseContent = `✅ Bot ist aktiv und postet in <#${config.channelId}>`;
+      } else {
+        responseContent = '❌ Bot ist nicht konfiguriert. Nutze `/setup` um ihn einzurichten.';
+      }
+      break;
+      
+    case 'check':
+      // Nur für Testing - prüft sofort auf neue Spiele
+      responseContent = '🔍 Prüfe auf neue Spiele... (kann bis zu 30 Sekunden dauern)';
+      // Führe Check im Hintergrund aus
+      checkAndPostFreeGames(env).catch(console.error);
+      break;
+      
+    default:
+      responseContent = '❌ Unbekannter Befehl';
+  }
+  
+  return new Response(JSON.stringify({
+    type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+    data: {
+      content: responseContent,
+      flags: 64 // Ephemeral (nur für den User sichtbar)
+    }
+  }), {
+    headers: { 'Content-Type': 'application/json' }
+  });
+}
 
 /**
  * Hauptfunktion: Prüft auf kostenlose Spiele und postet neue
@@ -99,6 +165,10 @@ async function checkAndPostFreeGames(env: Env): Promise<void> {
     
     console.log(`📋 ${freeGames.length} kostenlose Spiele gefunden`);
     
+    // Hole alle konfigurierten Guilds
+    const guilds = await getAllGuildConfigs(env);
+    console.log(`📊 ${guilds.length} Server konfiguriert`);
+    
     let newGamesCount = 0;
     
     for (const game of freeGames) {
@@ -106,15 +176,16 @@ async function checkAndPostFreeGames(env: Env): Promise<void> {
         console.log(`🆕 Neues kostenloses Spiel: ${game.title}`);
         
         const embed = createEmbed(game);
-        const success = await sendToDiscord(env.DISCORD_WEBHOOK_URL, embed);
         
-        if (success) {
-          console.log(`✅ Erfolgreich gepostet: ${game.title}`);
-          postedGames.push(game.id);
-          newGamesCount++;
-        } else {
-          console.log(`❌ Fehler beim Posten: ${game.title}`);
+        // Poste in alle konfigurierten Channels
+        for (const guild of guilds) {
+          if (guild.enabled) {
+            await sendToChannel(env, guild.channelId, embed);
+          }
         }
+        
+        postedGames.push(game.id);
+        newGamesCount++;
       }
     }
     
@@ -131,6 +202,32 @@ async function checkAndPostFreeGames(env: Env): Promise<void> {
 }
 
 /**
+ * Sendet Embed in einen Discord Channel
+ */
+async function sendToChannel(env: Env, channelId: string, embed: any): Promise<boolean> {
+  try {
+    const response = await fetch(`https://discord.com/api/v10/channels/${channelId}/messages`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bot ${env.DISCORD_BOT_TOKEN}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ embeds: [embed] })
+    });
+    
+    if (!response.ok) {
+      console.error(`Fehler beim Senden in Channel ${channelId}:`, await response.text());
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Fehler beim Senden:', error);
+    return false;
+  }
+}
+
+/**
  * Holt kostenlose Spiele von Epic Games API
  */
 async function getFreeGames(): Promise<Game[] | null> {
@@ -138,9 +235,7 @@ async function getFreeGames(): Promise<Game[] | null> {
   
   try {
     const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0'
-      }
+      headers: { 'User-Agent': 'Mozilla/5.0' }
     });
     
     if (!response.ok) {
@@ -202,16 +297,14 @@ function parseFreeGames(data: any): Game[] {
 /**
  * Erstellt Discord Embed
  */
-function createEmbed(game: Game): DiscordEmbed {
-  const embed: DiscordEmbed = {
+function createEmbed(game: Game): any {
+  const embed: any = {
     title: `🎮 ${game.title} - KOSTENLOS!`,
     description: game.description.substring(0, 500) + (game.description.length > 500 ? '...' : ''),
     color: 3447003,
     url: game.url,
     fields: [],
-    footer: {
-      text: 'Epic Games Store • Kostenlos erhältlich'
-    },
+    footer: { text: 'Epic Games Store • Kostenlos erhältlich' },
     timestamp: new Date().toISOString()
   };
   
@@ -248,35 +341,40 @@ function createEmbed(game: Game): DiscordEmbed {
   return embed;
 }
 
-/**
- * Sendet Embed an Discord via Webhook
- */
-async function sendToDiscord(webhookUrl: string, embed: DiscordEmbed): Promise<boolean> {
-  if (!webhookUrl) {
-    console.error('❌ DISCORD_WEBHOOK_URL nicht gesetzt!');
-    return false;
-  }
-  
-  try {
-    const response = await fetch(webhookUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ embeds: [embed] })
-    });
-    
-    return response.status === 204 || response.ok;
-    
-  } catch (error) {
-    console.error('Fehler beim Senden an Discord:', error);
-    return false;
+// KV Storage Funktionen für Guild Configs
+async function saveGuildConfig(env: Env, guildId: string, channelId: string): Promise<void> {
+  const config: GuildConfig = { guildId, channelId, enabled: true };
+  await env.GUILD_CONFIGS.put(guildId, JSON.stringify(config));
+}
+
+async function getGuildConfig(env: Env, guildId: string): Promise<GuildConfig | null> {
+  const data = await env.GUILD_CONFIGS.get(guildId, 'json');
+  return data as GuildConfig | null;
+}
+
+async function disableGuild(env: Env, guildId: string): Promise<void> {
+  const config = await getGuildConfig(env, guildId);
+  if (config) {
+    config.enabled = false;
+    await env.GUILD_CONFIGS.put(guildId, JSON.stringify(config));
   }
 }
 
-/**
- * Lädt gepostete Spiele aus KV Storage
- */
+async function getAllGuildConfigs(env: Env): Promise<GuildConfig[]> {
+  const list = await env.GUILD_CONFIGS.list();
+  const configs: GuildConfig[] = [];
+  
+  for (const key of list.keys) {
+    const config = await env.GUILD_CONFIGS.get(key.name, 'json');
+    if (config) {
+      configs.push(config as GuildConfig);
+    }
+  }
+  
+  return configs;
+}
+
+// KV Storage Funktionen für Posted Games
 async function loadPostedGames(env: Env): Promise<string[]> {
   try {
     const data = await env.POSTED_GAMES.get('games', 'json');
@@ -287,9 +385,6 @@ async function loadPostedGames(env: Env): Promise<string[]> {
   }
 }
 
-/**
- * Speichert gepostete Spiele in KV Storage
- */
 async function savePostedGames(env: Env, games: string[]): Promise<void> {
   try {
     const gamesToStore = games.slice(-100);
