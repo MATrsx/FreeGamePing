@@ -275,13 +275,6 @@ const translations: Record<Language, any> = {
   },
 };
 
-const storeEmojis: Record<StoreType, string> = {
-  epic: '🎮',
-  steam: '🚂',
-  gog: '🎯',
-  ubisoft: '🎪'
-};
-
 const storeNames: Record<StoreType, string> = {
   epic: 'Epic Games Store',
   steam: 'Steam',
@@ -454,7 +447,7 @@ async function handleCommand(interaction: any, env: Env, ctx: ExecutionContext):
           {
             name: "📦 " + t.status_stores,
             value: config.stores
-              .map(s => `${storeEmojis[s]} ${storeNames[s]}`)
+              .map(s => `${getStoreIcon(s)} ${storeNames[s]}`)
               .join("\n"),
             inline: true
           },
@@ -469,7 +462,7 @@ async function handleCommand(interaction: any, env: Env, ctx: ExecutionContext):
             name: "🧵 Threads",
             value: config.separateThreads
               ? Object.entries(config.storeThreads)
-                  .map(([store, thread]) => `${storeEmojis[store as StoreType]} <#${thread}>`)
+                  .map(([store, thread]) => `${getStoreIcon(store as StoreType)} <#${thread}>`)
                   .join("\n") || "—"
               : "—",
             inline: false
@@ -494,7 +487,7 @@ async function handleCommand(interaction: any, env: Env, ctx: ExecutionContext):
     case 'stores':
       const stores = options?.[0]?.value?.split(',').map((s: string) => s.trim() as StoreType) || [];
       await updateStores(env, guildId, stores);
-      responseContent = `${t.stores_updated}: ${stores.map(s => storeEmojis[s] + ' ' + storeNames[s]).join(', ')}`;
+      responseContent = `${t.stores_updated}: ${stores.map(s => getStoreIcon(s) + ' ' + storeNames[s]).join(', ')}`;
       break;
       
     case 'role':
@@ -520,7 +513,7 @@ async function handleCommand(interaction: any, env: Env, ctx: ExecutionContext):
       const store = options?.find((o: any) => o.name === 'store')?.value as StoreType;
       const thread = options?.find((o: any) => o.name === 'thread')?.value;
       await setStoreThread(env, guildId, store, thread);
-      responseContent = `${t.thread_configured} ${storeEmojis[store]} ${storeNames[store]}: <#${thread}>`;
+      responseContent = `${t.thread_configured} ${getStoreIcon(store)} ${storeNames[store]}: <#${thread}>`;
       break;
       
     case 'check':
@@ -914,7 +907,7 @@ function createEmbed(game: Game, t: any, lang: Language): any {
   const endTimestamp = Math.floor(new Date(game.endDate).getTime() / 1000);
   
   const embed: any = {
-    title: `${storeEmojis[game.store]} ${game.title} - ${t.free_title}`,
+    title: `${getStoreIcon(game.store)} ${game.title} - ${t.free_title}`,
     description: game.description.substring(0, 500) + (game.description.length > 500 ? '...' : ''),
     color: storeColors[game.store],
     url: game.url,
@@ -977,10 +970,10 @@ function createEmbed(game: Game, t: any, lang: Language): any {
 
 function getStoreIcon(store: StoreType): string {
   const icons: Record<StoreType, string> = {
-    epic: 'https://cdn2.unrealengine.com/epic-games-logo-500x500-500x500-3e72e23ebbf2.png',
-    steam: 'https://cdn.cloudflare.steamstatic.com/steamcommunity/public/images/avatars/c5/c5d1b456e4c155f2e3f9c08f06b3d5210d2aba1a_full.jpg',
-    gog: 'https://images.gog-statics.com/3e1d0e5a7e608447cba20c1c3b03f1a10ee8a0ec3c8b05ca3eb6c6922c0287d6_glx_logo_gog.png',
-    ubisoft: 'https://staticctf.ubisoft.com/J3yJr34U2pZ2Ieem48Dwy9uqj5PNUQTn/4QKg5jIUI1HJAXaSqEUz1I/8d4e9a45c8b97e61c5cdeae97f93f359/ubi_logo.png'
+    epic: 'https://upload.wikimedia.org/wikipedia/commons/5/58/Epic_Games_Store_logo_2023_vertical_white.svg',
+    steam: 'https://upload.wikimedia.org/wikipedia/commons/8/83/Steam_icon_logo.svg',
+    gog: 'https://upload.wikimedia.org/wikipedia/commons/2/2e/GOG.com_logo.svg',
+    ubisoft: 'https://upload.wikimedia.org/wikipedia/commons/7/78/Ubisoft_logo.svg'
   };
   return icons[store];
 }
