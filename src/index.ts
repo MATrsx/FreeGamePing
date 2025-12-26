@@ -482,29 +482,18 @@ async function updateInteractionResponse(env: Env, token: string, content: strin
 }
 
 async function checkAndPostFreeGames(env: Env): Promise<void> {
-  console.log("🔍 Checking for free games...");
-
+  console.log(`🔍 Checking for free games... (${new Date().toISOString()})`);
+  
   try {
-    console.log("Load Guild configs...");
     const guilds = await getAllGuildConfigs(env);
-    console.log("Guild configs loaded:", JSON.stringify(guilds, null, 2));
-
     const postedGames = await loadPostedGames(env);
-    console.log("Posted games loaded:", postedGames);
-
-    for (const guild of guilds) {
-      console.log("Processing guild:", guild.guildId, guild);
-
-      if (!guild.stores || !Array.isArray(guild.stores)) {
-        console.error("❌ ERROR: guild.stores is invalid:", guild.stores);
-        continue;
-      }
-
+    
+    for (const guild of guilds.filter(g => g.enabled)) {
+      const t = translations[guild.language];
+      let newGamesCount = 0;
+      
       for (const store of guild.stores) {
-        console.log("Fetching store:", store);
-
         const games = await getFreeGamesForStore(store);
-        console.log("Store result:", store, games);
         
         if (!games || games.length === 0) continue;
         
