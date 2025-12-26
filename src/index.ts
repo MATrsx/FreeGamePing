@@ -566,10 +566,10 @@ async function checkAndPostFreeGames(env: Env): Promise<void> {
   try {
     const guilds = await getAllGuildConfigs(env);
     const postedGames = await loadPostedGames(env);
+    let newGamesCount = 0;
     
     for (const guild of guilds.filter(g => g.enabled)) {
       const t = translations[guild.language];
-      let newGamesCount = 0;
       
       for (const store of guild.stores) {
         const games = await getFreeGamesForStore(store);
@@ -607,7 +607,7 @@ async function checkAndPostFreeGames(env: Env): Promise<void> {
     
     if (postedGames.length > 0) {
       await savePostedGames(env, postedGames);
-    } else {
+    } else if (newGamesCount === 0) {
       console.log('ℹ️  No new games found.');
     }
     
