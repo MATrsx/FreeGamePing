@@ -1,7 +1,6 @@
 {
 	"name": "freegameping",
-	"version": "0.0.0",
-	"private": true,
+	"version": "1.0.0",
 	"scripts": {
 		"deploy": "wrangler deploy",
 		"dev": "wrangler dev",
@@ -9,6 +8,9 @@
 		"test": "vitest",
 		"cf-typegen": "wrangler types"
 	},
+    "dependencies": {
+        "discord-interactions": "^3.4.0"
+    },
 	"devDependencies": {
 		"@cloudflare/vitest-pool-workers": "^0.8.19",
 		"typescript": "^5.5.2",

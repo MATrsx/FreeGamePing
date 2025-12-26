@@ -14,6 +14,10 @@
 		{
 			"binding": "POSTED_GAMES",
 			"id": "0b9bb022854d4dfda1e014c7afee79e8"
+		},
+		{
+			"binding": "GUILD_CONFIGS",
+			"id": "3ac68e8a834e4a2fb8742d5bacd7ff5b"
 		}
 	]
 	/**
