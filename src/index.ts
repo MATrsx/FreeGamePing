@@ -1,7 +1,7 @@
 /**
  * Multi-Store Free Games Bot für Cloudflare Workers (TypeScript)
  * Unterstützt: Epic Games, Steam, GOG, Ubisoft Connect
- * Mit erweiterten Discord Bot Features und Multi-Language Support
+ * Mit erweiterten Discord Features und Multi-Language Support
  */
 
 import { verifyKey } from 'discord-interactions';
@@ -14,158 +14,286 @@ interface Env {
   DISCORD_APPLICATION_ID: string;
 }
 
+type StoreType = 'epic' | 'steam' | 'gog' | 'ubisoft';
+type Language = 'en' | 'de' | 'fr' | 'es' | 'it' | 'pt' | 'ru' | 'pl';
+
 interface GuildConfig {
   guildId: string;
   channelId: string;
   threadId?: string;
   enabled: boolean;
-  language: string;
-  enabledStores: Store[];
-  storeChannels: Record<Store, string>; // Separate Channels pro Store
-  mentionRoles: string[]; // Role IDs zum Pingen
-  notifyOnlyMajorGames: boolean;
+  language: Language;
+  stores: StoreType[];
+  mentionRoles: string[];
+  separateThreads: boolean;
+  storeThreads?: {
+    [key in StoreType]?: string;
+  };
 }
-
-type Store = 'epic' | 'steam' | 'gog' | 'ubisoft';
 
 interface Game {
   id: string;
+  store: StoreType;
   title: string;
   description: string;
   startDate: string;
   endDate: string;
   url: string;
   image: string | null;
-  store: Store;
-  originalPrice?: string;
-  currentPrice: string;
-  rating?: number;
-  reviewCount?: number;
-  tags?: string[];
+  price?: {
+    original: number;
+    discount: number;
+    currency: string;
+  };
+  rating?: {
+    score: number;
+    count: number;
+  };
 }
 
 // Discord Interaction Types
 const InteractionType = {
   PING: 1,
   APPLICATION_COMMAND: 2,
-  MESSAGE_COMPONENT: 3,
-  APPLICATION_COMMAND_AUTOCOMPLETE: 4,
-  MODAL_SUBMIT: 5,
 };
 
 const InteractionResponseType = {
   PONG: 1,
   CHANNEL_MESSAGE_WITH_SOURCE: 4,
   DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE: 5,
-  DEFERRED_UPDATE_MESSAGE: 6,
-  UPDATE_MESSAGE: 7,
-  APPLICATION_COMMAND_AUTOCOMPLETE_RESULT: 8,
-  MODAL: 9,
 };
 
-// Übersetzungen
-const translations: Record<string, Record<string, string>> = {
+// Translations
+const translations: Record<Language, any> = {
   en: {
     setup_success: '✅ Bot configured! Free games will be posted in',
+    setup_thread_success: '✅ Bot configured! Free games will be posted in the thread',
     disabled: '❌ Bot disabled. Use `/setup` to enable it again.',
     status_active: '✅ Bot is active and posting in',
     status_inactive: '❌ Bot is not configured. Use `/setup` to set it up.',
-    checking: '🔍 Checking for new games... (may take up to 30 seconds)',
+    status_stores: '📦 Active stores',
+    status_language: '🌍 Language',
+    status_roles: '👥 Mention roles',
+    check_running: '🔍 Checking for new games... (may take up to 30 seconds)',
     unknown_command: '❌ Unknown command',
-    free: 'FREE',
+    free_title: 'FREE!',
     available_until: '⏰ Available until',
-    original_price: '💰 Original Price',
+    get_now: '🔗 Get now',
+    original_price: '💰 Original price',
     rating: '⭐ Rating',
-    get_now: '🔗 Get Now',
-    store_page: 'Store Page',
-    launcher: 'Launcher',
-    footer: 'Free to Keep',
-    stores_updated: '✅ Enabled stores updated:',
-    language_updated: '✅ Language changed to English',
-    role_added: '✅ Role will be mentioned for new games',
-    role_removed: '❌ Role removed from mentions',
-    thread_set: '✅ Games will be posted in the specified thread',
-    channel_set: '✅ Channel set for',
+    store_footer: 'Free to keep',
+    language_changed: '✅ Language changed to',
+    stores_updated: '✅ Store configuration updated',
+    role_added: '✅ Role added to mentions',
+    role_removed: '✅ Role removed from mentions',
+    separate_threads_enabled: '✅ Separate threads enabled. Configure threads with `/thread`',
+    separate_threads_disabled: '✅ Separate threads disabled',
+    thread_configured: '✅ Thread configured for',
+    no_games: 'ℹ️ No free games found',
   },
   de: {
     setup_success: '✅ Bot eingerichtet! Kostenlose Spiele werden gepostet in',
+    setup_thread_success: '✅ Bot eingerichtet! Kostenlose Spiele werden im Thread gepostet',
     disabled: '❌ Bot deaktiviert. Nutze `/setup` um ihn wieder zu aktivieren.',
     status_active: '✅ Bot ist aktiv und postet in',
     status_inactive: '❌ Bot ist nicht konfiguriert. Nutze `/setup` um ihn einzurichten.',
-    checking: '🔍 Prüfe auf neue Spiele... (kann bis zu 30 Sekunden dauern)',
+    status_stores: '📦 Aktive Stores',
+    status_language: '🌍 Sprache',
+    status_roles: '👥 Erwähnte Rollen',
+    check_running: '🔍 Prüfe auf neue Spiele... (kann bis zu 30 Sekunden dauern)',
     unknown_command: '❌ Unbekannter Befehl',
-    free: 'KOSTENLOS',
+    free_title: 'KOSTENLOS!',
     available_until: '⏰ Verfügbar bis',
+    get_now: '🔗 Jetzt holen',
     original_price: '💰 Originalpreis',
     rating: '⭐ Bewertung',
-    get_now: '🔗 Jetzt holen',
-    store_page: 'Store-Seite',
-    launcher: 'Launcher',
-    footer: 'Kostenlos erhältlich',
-    stores_updated: '✅ Aktivierte Stores aktualisiert:',
-    language_updated: '✅ Sprache auf Deutsch geändert',
-    role_added: '✅ Rolle wird bei neuen Spielen erwähnt',
-    role_removed: '❌ Rolle von Erwähnungen entfernt',
-    thread_set: '✅ Spiele werden im angegebenen Thread gepostet',
-    channel_set: '✅ Channel gesetzt für',
+    store_footer: 'Kostenlos erhältlich',
+    language_changed: '✅ Sprache geändert zu',
+    stores_updated: '✅ Store-Konfiguration aktualisiert',
+    role_added: '✅ Rolle zu Erwähnungen hinzugefügt',
+    role_removed: '✅ Rolle von Erwähnungen entfernt',
+    separate_threads_enabled: '✅ Separate Threads aktiviert. Konfiguriere Threads mit `/thread`',
+    separate_threads_disabled: '✅ Separate Threads deaktiviert',
+    thread_configured: '✅ Thread konfiguriert für',
+    no_games: 'ℹ️ Keine kostenlosen Spiele gefunden',
+  },
+  fr: {
+    setup_success: '✅ Bot configuré! Les jeux gratuits seront postés dans',
+    setup_thread_success: '✅ Bot configuré! Les jeux gratuits seront postés dans le fil',
+    disabled: '❌ Bot désactivé. Utilisez `/setup` pour le réactiver.',
+    status_active: '✅ Le bot est actif et poste dans',
+    status_inactive: '❌ Le bot n\'est pas configuré. Utilisez `/setup` pour le configurer.',
+    status_stores: '📦 Magasins actifs',
+    status_language: '🌍 Langue',
+    status_roles: '👥 Rôles mentionnés',
+    check_running: '🔍 Vérification des nouveaux jeux... (peut prendre jusqu\'à 30 secondes)',
+    unknown_command: '❌ Commande inconnue',
+    free_title: 'GRATUIT!',
+    available_until: '⏰ Disponible jusqu\'au',
+    get_now: '🔗 Obtenir maintenant',
+    original_price: '💰 Prix d\'origine',
+    rating: '⭐ Note',
+    store_footer: 'Gratuit à conserver',
+    language_changed: '✅ Langue changée en',
+    stores_updated: '✅ Configuration des magasins mise à jour',
+    role_added: '✅ Rôle ajouté aux mentions',
+    role_removed: '✅ Rôle retiré des mentions',
+    separate_threads_enabled: '✅ Fils séparés activés. Configurez les fils avec `/thread`',
+    separate_threads_disabled: '✅ Fils séparés désactivés',
+    thread_configured: '✅ Fil configuré pour',
+    no_games: 'ℹ️ Aucun jeu gratuit trouvé',
   },
   es: {
-    setup_success: '✅ ¡Bot configurado! Los juegos gratis se publicarán en',
+    setup_success: '✅ Bot configurado! Los juegos gratis se publicarán en',
+    setup_thread_success: '✅ Bot configurado! Los juegos gratis se publicarán en el hilo',
     disabled: '❌ Bot desactivado. Usa `/setup` para activarlo de nuevo.',
     status_active: '✅ El bot está activo y publicando en',
     status_inactive: '❌ El bot no está configurado. Usa `/setup` para configurarlo.',
-    checking: '🔍 Buscando nuevos juegos... (puede tardar hasta 30 segundos)',
+    status_stores: '📦 Tiendas activas',
+    status_language: '🌍 Idioma',
+    status_roles: '👥 Roles mencionados',
+    check_running: '🔍 Buscando nuevos juegos... (puede tardar hasta 30 segundos)',
     unknown_command: '❌ Comando desconocido',
-    free: 'GRATIS',
+    free_title: '¡GRATIS!',
     available_until: '⏰ Disponible hasta',
-    original_price: '💰 Precio Original',
-    rating: '⭐ Calificación',
-    get_now: '🔗 Obtener Ahora',
-    store_page: 'Página de la Tienda',
-    launcher: 'Lanzador',
-    footer: 'Gratis para Siempre',
-    stores_updated: '✅ Tiendas activadas actualizadas:',
-    language_updated: '✅ Idioma cambiado a Español',
-    role_added: '✅ El rol será mencionado para nuevos juegos',
-    role_removed: '❌ Rol eliminado de las menciones',
-    thread_set: '✅ Los juegos se publicarán en el hilo especificado',
-    channel_set: '✅ Canal establecido para',
+    get_now: '🔗 Obtener ahora',
+    original_price: '💰 Precio original',
+    rating: '⭐ Valoración',
+    store_footer: 'Gratis para siempre',
+    language_changed: '✅ Idioma cambiado a',
+    stores_updated: '✅ Configuración de tiendas actualizada',
+    role_added: '✅ Rol añadido a las menciones',
+    role_removed: '✅ Rol eliminado de las menciones',
+    separate_threads_enabled: '✅ Hilos separados activados. Configura hilos con `/thread`',
+    separate_threads_disabled: '✅ Hilos separados desactivados',
+    thread_configured: '✅ Hilo configurado para',
+    no_games: 'ℹ️ No se encontraron juegos gratis',
   },
-  fr: {
-    setup_success: '✅ Bot configuré ! Les jeux gratuits seront publiés dans',
-    disabled: '❌ Bot désactivé. Utilisez `/setup` pour le réactiver.',
-    status_active: '✅ Le bot est actif et publie dans',
-    status_inactive: '❌ Le bot n\'est pas configuré. Utilisez `/setup` pour le configurer.',
-    checking: '🔍 Recherche de nouveaux jeux... (peut prendre jusqu\'à 30 secondes)',
-    unknown_command: '❌ Commande inconnue',
-    free: 'GRATUIT',
-    available_until: '⏰ Disponible jusqu\'au',
-    original_price: '💰 Prix Original',
-    rating: '⭐ Note',
-    get_now: '🔗 Obtenir Maintenant',
-    store_page: 'Page du Store',
-    launcher: 'Lanceur',
-    footer: 'Gratuit à Conserver',
-    stores_updated: '✅ Magasins activés mis à jour :',
-    language_updated: '✅ Langue changée en Français',
-    role_added: '✅ Le rôle sera mentionné pour les nouveaux jeux',
-    role_removed: '❌ Rôle retiré des mentions',
-    thread_set: '✅ Les jeux seront publiés dans le fil spécifié',
-    channel_set: '✅ Canal défini pour',
-  }
+  it: {
+    setup_success: '✅ Bot configurato! I giochi gratis saranno pubblicati in',
+    setup_thread_success: '✅ Bot configurato! I giochi gratis saranno pubblicati nel thread',
+    disabled: '❌ Bot disabilitato. Usa `/setup` per riattivarlo.',
+    status_active: '✅ Il bot è attivo e pubblica in',
+    status_inactive: '❌ Il bot non è configurato. Usa `/setup` per configurarlo.',
+    status_stores: '📦 Store attivi',
+    status_language: '🌍 Lingua',
+    status_roles: '👥 Ruoli menzionati',
+    check_running: '🔍 Controllo nuovi giochi... (può richiedere fino a 30 secondi)',
+    unknown_command: '❌ Comando sconosciuto',
+    free_title: 'GRATIS!',
+    available_until: '⏰ Disponibile fino a',
+    get_now: '🔗 Ottieni ora',
+    original_price: '💰 Prezzo originale',
+    rating: '⭐ Valutazione',
+    store_footer: 'Gratis per sempre',
+    language_changed: '✅ Lingua cambiata in',
+    stores_updated: '✅ Configurazione store aggiornata',
+    role_added: '✅ Ruolo aggiunto alle menzioni',
+    role_removed: '✅ Ruolo rimosso dalle menzioni',
+    separate_threads_enabled: '✅ Thread separati abilitati. Configura i thread con `/thread`',
+    separate_threads_disabled: '✅ Thread separati disabilitati',
+    thread_configured: '✅ Thread configurato per',
+    no_games: 'ℹ️ Nessun gioco gratuito trovato',
+  },
+  pt: {
+    setup_success: '✅ Bot configurado! Jogos grátis serão postados em',
+    setup_thread_success: '✅ Bot configurado! Jogos grátis serão postados no tópico',
+    disabled: '❌ Bot desativado. Use `/setup` para reativá-lo.',
+    status_active: '✅ O bot está ativo e postando em',
+    status_inactive: '❌ O bot não está configurado. Use `/setup` para configurá-lo.',
+    status_stores: '📦 Lojas ativas',
+    status_language: '🌍 Idioma',
+    status_roles: '👥 Cargos mencionados',
+    check_running: '🔍 Verificando novos jogos... (pode levar até 30 segundos)',
+    unknown_command: '❌ Comando desconhecido',
+    free_title: 'GRÁTIS!',
+    available_until: '⏰ Disponível até',
+    get_now: '🔗 Obter agora',
+    original_price: '💰 Preço original',
+    rating: '⭐ Avaliação',
+    store_footer: 'Grátis para sempre',
+    language_changed: '✅ Idioma alterado para',
+    stores_updated: '✅ Configuração de lojas atualizada',
+    role_added: '✅ Cargo adicionado às menções',
+    role_removed: '✅ Cargo removido das menções',
+    separate_threads_enabled: '✅ Tópicos separados ativados. Configure tópicos com `/thread`',
+    separate_threads_disabled: '✅ Tópicos separados desativados',
+    thread_configured: '✅ Tópico configurado para',
+    no_games: 'ℹ️ Nenhum jogo grátis encontrado',
+  },
+  ru: {
+    setup_success: '✅ Бот настроен! Бесплатные игры будут публиковаться в',
+    setup_thread_success: '✅ Бот настроен! Бесплатные игры будут публиковаться в треде',
+    disabled: '❌ Бот отключен. Используйте `/setup` для повторной активации.',
+    status_active: '✅ Бот активен и публикует в',
+    status_inactive: '❌ Бот не настроен. Используйте `/setup` для настройки.',
+    status_stores: '📦 Активные магазины',
+    status_language: '🌍 Язык',
+    status_roles: '👥 Упоминаемые роли',
+    check_running: '🔍 Проверка новых игр... (может занять до 30 секунд)',
+    unknown_command: '❌ Неизвестная команда',
+    free_title: 'БЕСПЛАТНО!',
+    available_until: '⏰ Доступно до',
+    get_now: '🔗 Получить сейчас',
+    original_price: '💰 Исходная цена',
+    rating: '⭐ Рейтинг',
+    store_footer: 'Бесплатно навсегда',
+    language_changed: '✅ Язык изменен на',
+    stores_updated: '✅ Конфигурация магазинов обновлена',
+    role_added: '✅ Роль добавлена к упоминаниям',
+    role_removed: '✅ Роль удалена из упоминаний',
+    separate_threads_enabled: '✅ Отдельные треды включены. Настройте треды с помощью `/thread`',
+    separate_threads_disabled: '✅ Отдельные треды отключены',
+    thread_configured: '✅ Тред настроен для',
+    no_games: 'ℹ️ Бесплатные игры не найдены',
+  },
+  pl: {
+    setup_success: '✅ Bot skonfigurowany! Darmowe gry będą publikowane w',
+    setup_thread_success: '✅ Bot skonfigurowany! Darmowe gry będą publikowane w wątku',
+    disabled: '❌ Bot wyłączony. Użyj `/setup` aby go włączyć ponownie.',
+    status_active: '✅ Bot jest aktywny i publikuje w',
+    status_inactive: '❌ Bot nie jest skonfigurowany. Użyj `/setup` aby go skonfigurować.',
+    status_stores: '📦 Aktywne sklepy',
+    status_language: '🌍 Język',
+    status_roles: '👥 Wspominane role',
+    check_running: '🔍 Sprawdzanie nowych gier... (może potrwać do 30 sekund)',
+    unknown_command: '❌ Nieznana komenda',
+    free_title: 'ZA DARMO!',
+    available_until: '⏰ Dostępne do',
+    get_now: '🔗 Pobierz teraz',
+    original_price: '💰 Cena oryginalna',
+    rating: '⭐ Ocena',
+    store_footer: 'Darmowe na zawsze',
+    language_changed: '✅ Język zmieniony na',
+    stores_updated: '✅ Konfiguracja sklepów zaktualizowana',
+    role_added: '✅ Rola dodana do wzmianek',
+    role_removed: '✅ Rola usunięta ze wzmianek',
+    separate_threads_enabled: '✅ Osobne wątki włączone. Skonfiguruj wątki za pomocą `/thread`',
+    separate_threads_disabled: '✅ Osobne wątki wyłączone',
+    thread_configured: '✅ Wątek skonfigurowany dla',
+    no_games: 'ℹ️ Nie znaleziono darmowych gier',
+  },
 };
 
-function t(config: GuildConfig | null, key: string): string {
-  const lang = config?.language || 'en';
-  return translations[lang]?.[key] || translations['en'][key] || key;
-}
+const storeEmojis: Record<StoreType, string> = {
+  epic: '🎮',
+  steam: '🚂',
+  gog: '🎯',
+  ubisoft: '🎪'
+};
 
-// Store Icons und Farben
-const storeInfo: Record<Store, { icon: string; color: number; name: string }> = {
-  epic: { icon: '🎮', color: 0x2A2A2A, name: 'Epic Games' },
-  steam: { icon: '🎯', color: 0x1B2838, name: 'Steam' },
-  gog: { icon: '🎪', color: 0x86328A, name: 'GOG' },
-  ubisoft: { icon: '🎨', color: 0x0082CA, name: 'Ubisoft Connect' }
+const storeNames: Record<StoreType, string> = {
+  epic: 'Epic Games Store',
+  steam: 'Steam',
+  gog: 'GOG',
+  ubisoft: 'Ubisoft Connect'
+};
+
+const storeColors: Record<StoreType, number> = {
+  epic: 0x0078F2,
+  steam: 0x171A21,
+  gog: 0x86328A,
+  ubisoft: 0x0080FF
 };
 
 export default {
@@ -181,31 +309,16 @@ export default {
       return handleDiscordInteraction(request, env, ctx);
     }
     
-    // Manueller Check Endpoint
+    // Manual check endpoint
     if (request.method === 'POST' && url.pathname === '/check') {
-      ctx.waitUntil(checkAndPostFreeGames(env));
-      return new Response('Check initiated', { status: 200 });
+      await checkAndPostFreeGames(env);
+      return new Response('Check completed', { status: 200 });
     }
     
-    // Status Endpoint
-    if (request.method === 'GET' && url.pathname === '/status') {
-      const guilds = await getAllGuildConfigs(env);
-      return new Response(JSON.stringify({
-        status: 'running',
-        guilds: guilds.length,
-        timestamp: new Date().toISOString()
-      }), {
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-    
-    return new Response('Multi-Store Free Games Bot 🎮', { status: 200 });
+    return new Response('Free Games Bot is running! 🎮', { status: 200 });
   }
 };
 
-/**
- * Verarbeitet Discord Interactions (Slash Commands)
- */
 async function handleDiscordInteraction(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
   const signature = request.headers.get('X-Signature-Ed25519');
   const timestamp = request.headers.get('X-Signature-Timestamp');
@@ -235,181 +348,186 @@ async function handleDiscordInteraction(request: Request, env: Env, ctx: Executi
   return new Response('Unknown interaction type', { status: 400 });
 }
 
-/**
- * Verarbeitet Slash Commands
- */
 async function handleCommand(interaction: any, env: Env, ctx: ExecutionContext): Promise<Response> {
   const { name, options } = interaction.data;
   const guildId = interaction.guild_id;
+  
+  // Get current config for language
   const config = await getGuildConfig(env, guildId);
+  const lang = config?.language || 'en';
+  const t = translations[lang];
   
   let responseContent = '';
+  let deferred = false;
   
   switch (name) {
     case 'setup':
-      const channelId = options?.[0]?.value || interaction.channel_id;
-      await saveGuildConfig(env, {
-        guildId,
-        channelId,
-        enabled: true,
-        language: 'en',
-        enabledStores: ['epic', 'steam', 'gog', 'ubisoft'],
-        storeChannels: {} as Record<Store, string>,
-        mentionRoles: [],
-        notifyOnlyMajorGames: false
-      });
-      responseContent = `${t(config, 'setup_success')} <#${channelId}>`;
+      const channelOption = options?.find((o: any) => o.name === 'channel');
+      const threadOption = options?.find((o: any) => o.name === 'thread');
+      const channelId = channelOption?.value || interaction.channel_id;
+      const threadId = threadOption?.value;
+      
+      await saveGuildConfig(env, guildId, channelId, threadId);
+      
+      if (threadId) {
+        responseContent = `${t.setup_thread_success} <#${threadId}>`;
+      } else {
+        responseContent = `${t.setup_success} <#${channelId}>`;
+      }
       break;
       
     case 'disable':
       await disableGuild(env, guildId);
-      responseContent = t(config, 'disabled');
+      responseContent = t.disabled;
       break;
       
     case 'status':
-      if (config && config.enabled) {
-        const stores = config.enabledStores.map(s => storeInfo[s].name).join(', ');
-        responseContent = `${t(config, 'status_active')} <#${config.channelId}>\n📦 **Stores:** ${stores}\n🌐 **Language:** ${config.language.toUpperCase()}`;
+      const statusConfig = await getGuildConfig(env, guildId);
+      if (statusConfig && statusConfig.enabled) {
+        const channelMention = statusConfig.threadId 
+          ? `<#${statusConfig.threadId}>` 
+          : `<#${statusConfig.channelId}>`;
+        responseContent = `${t.status_active} ${channelMention}\n\n`;
+        responseContent += `${t.status_language}: ${statusConfig.language}\n`;
+        responseContent += `${t.status_stores}: ${statusConfig.stores.map(s => storeEmojis[s] + ' ' + storeNames[s]).join(', ')}\n`;
         
-        if (config.mentionRoles.length > 0) {
-          responseContent += `\n👥 **Roles:** ${config.mentionRoles.map(r => `<@&${r}>`).join(', ')}`;
+        if (statusConfig.mentionRoles.length > 0) {
+          responseContent += `${t.status_roles}: ${statusConfig.mentionRoles.map(r => `<@&${r}>`).join(', ')}`;
         }
       } else {
-        responseContent = t(config, 'status_inactive');
-      }
-      break;
-      
-    case 'stores':
-      const selectedStores = options?.map((opt: any) => opt.value) || [];
-      if (config && selectedStores.length > 0) {
-        config.enabledStores = selectedStores;
-        await env.GUILD_CONFIGS.put(guildId, JSON.stringify(config));
-        const storeNames = selectedStores.map((s: Store) => storeInfo[s].name).join(', ');
-        responseContent = `${t(config, 'stores_updated')} ${storeNames}`;
+        responseContent = t.status_inactive;
       }
       break;
       
     case 'language':
-      const lang = options?.[0]?.value || 'en';
-      if (config) {
-        config.language = lang;
-        await env.GUILD_CONFIGS.put(guildId, JSON.stringify(config));
-        responseContent = t(config, 'language_updated');
-      }
+      const newLang = options?.[0]?.value as Language;
+      await updateLanguage(env, guildId, newLang);
+      responseContent = `${translations[newLang].language_changed} ${newLang}`;
+      break;
+      
+    case 'stores':
+      const stores = options?.[0]?.value?.split(',').map((s: string) => s.trim() as StoreType) || [];
+      await updateStores(env, guildId, stores);
+      responseContent = `${t.stores_updated}: ${stores.map(s => storeEmojis[s] + ' ' + storeNames[s]).join(', ')}`;
       break;
       
     case 'role':
-      const action = options?.[0]?.name;
-      const roleId = options?.[0]?.options?.[0]?.value;
+      const action = options?.find((o: any) => o.name === 'action')?.value;
+      const roleId = options?.find((o: any) => o.name === 'role')?.value;
       
-      if (config && roleId) {
-        if (action === 'add') {
-          if (!config.mentionRoles.includes(roleId)) {
-            config.mentionRoles.push(roleId);
-            await env.GUILD_CONFIGS.put(guildId, JSON.stringify(config));
-          }
-          responseContent = `${t(config, 'role_added')} <@&${roleId}>`;
-        } else if (action === 'remove') {
-          config.mentionRoles = config.mentionRoles.filter(r => r !== roleId);
-          await env.GUILD_CONFIGS.put(guildId, JSON.stringify(config));
-          responseContent = `${t(config, 'role_removed')} <@&${roleId}>`;
-        }
+      if (action === 'add') {
+        await addMentionRole(env, guildId, roleId);
+        responseContent = `${t.role_added}: <@&${roleId}>`;
+      } else if (action === 'remove') {
+        await removeMentionRole(env, guildId, roleId);
+        responseContent = `${t.role_removed}: <@&${roleId}>`;
       }
+      break;
+      
+    case 'separate-threads':
+      const enabled = options?.[0]?.value;
+      await setSeparateThreads(env, guildId, enabled);
+      responseContent = enabled ? t.separate_threads_enabled : t.separate_threads_disabled;
       break;
       
     case 'thread':
-      const threadId = options?.[0]?.value;
-      if (config && threadId) {
-        config.threadId = threadId;
-        await env.GUILD_CONFIGS.put(guildId, JSON.stringify(config));
-        responseContent = t(config, 'thread_set');
-      }
-      break;
-      
-    case 'store-channel':
-      const store = options?.[0]?.value as Store;
-      const storeChannelId = options?.[1]?.value;
-      
-      if (config && store && storeChannelId) {
-        config.storeChannels[store] = storeChannelId;
-        await env.GUILD_CONFIGS.put(guildId, JSON.stringify(config));
-        responseContent = `${t(config, 'channel_set')} ${storeInfo[store].name}: <#${storeChannelId}>`;
-      }
+      const store = options?.find((o: any) => o.name === 'store')?.value as StoreType;
+      const thread = options?.find((o: any) => o.name === 'thread')?.value;
+      await setStoreThread(env, guildId, store, thread);
+      responseContent = `${t.thread_configured} ${storeEmojis[store]} ${storeNames[store]}: <#${thread}>`;
       break;
       
     case 'check':
-      responseContent = t(config, 'checking');
-      ctx.waitUntil(checkAndPostFreeGames(env).catch(console.error));
+      // Defer response for long-running operations
+      deferred = true;
+      ctx.waitUntil(
+        (async () => {
+          await checkAndPostFreeGames(env);
+          // Update original response
+          await updateInteractionResponse(env, interaction.token, t.check_running + ' ✅');
+        })()
+      );
+      responseContent = t.check_running;
       break;
       
     default:
-      responseContent = t(config, 'unknown_command');
+      responseContent = t.unknown_command;
   }
   
-  return new Response(JSON.stringify({
-    type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+  const response: any = {
+    type: deferred ? InteractionResponseType.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE : InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
     data: {
       content: responseContent,
-      flags: 64
+      flags: 64 // Ephemeral
     }
-  }), {
+  };
+  
+  return new Response(JSON.stringify(response), {
     headers: { 'Content-Type': 'application/json' }
   });
 }
 
-/**
- * Hauptfunktion: Prüft alle Stores auf kostenlose Spiele
- */
+async function updateInteractionResponse(env: Env, token: string, content: string): Promise<void> {
+  try {
+    await fetch(`https://discord.com/api/v10/webhooks/${env.DISCORD_APPLICATION_ID}/${token}/messages/@original`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ content })
+    });
+  } catch (error) {
+    console.error('Error updating interaction:', error);
+  }
+}
+
 async function checkAndPostFreeGames(env: Env): Promise<void> {
   console.log(`🔍 Checking for free games... (${new Date().toISOString()})`);
   
   try {
-    const postedGames = await loadPostedGames(env);
     const guilds = await getAllGuildConfigs(env);
+    const postedGames = await loadPostedGames(env);
     
-    // Hole Spiele von allen Stores parallel
-    const [epicGames, steamGames, gogGames, ubisoftGames] = await Promise.all([
-      getEpicGames(),
-      getSteamGames(),
-      getGOGGames(),
-      getUbisoftGames()
-    ]);
-    
-    const allGames = [
-      ...(epicGames || []),
-      ...(steamGames || []),
-      ...(gogGames || []),
-      ...(ubisoftGames || [])
-    ];
-    
-    console.log(`📋 Found ${allGames.length} free games across all stores`);
-    
-    let newGamesCount = 0;
-    
-    for (const game of allGames) {
-      const gameKey = `${game.store}:${game.id}`;
+    for (const guild of guilds.filter(g => g.enabled)) {
+      const t = translations[guild.language];
+      let newGamesCount = 0;
       
-      if (!postedGames.includes(gameKey)) {
-        console.log(`🆕 New free game: ${game.title} (${game.store})`);
+      for (const store of guild.stores) {
+        const games = await getFreeGamesForStore(store);
         
-        // Poste in relevante Guilds
-        for (const guild of guilds.filter(g => g.enabled && g.enabledStores.includes(game.store))) {
-          const embed = createEmbed(game, guild);
-          const targetChannel = guild.storeChannels[game.store] || guild.channelId;
-          const threadId = guild.threadId;
-          const mentionRoles = guild.mentionRoles.map(r => `<@&${r}>`).join(' ');
+        if (!games || games.length === 0) continue;
+        
+        for (const game of games) {
+          const gameKey = `${store}-${game.id}`;
           
-          await sendToChannel(env, targetChannel, embed, threadId, mentionRoles);
+          if (!postedGames.includes(gameKey)) {
+            console.log(`🆕 New free game: ${game.title} (${store})`);
+            
+            const embed = createEmbed(game, t, guild.language);
+            const mentions = guild.mentionRoles.map(r => `<@&${r}>`).join(' ');
+            
+            // Determine target
+            let targetId = guild.channelId;
+            if (guild.separateThreads && guild.storeThreads?.[store]) {
+              targetId = guild.storeThreads[store]!;
+            } else if (guild.threadId) {
+              targetId = guild.threadId;
+            }
+            
+            await sendToChannel(env, targetId, embed, mentions);
+            postedGames.push(gameKey);
+            newGamesCount++;
+          }
         }
-        
-        postedGames.push(gameKey);
-        newGamesCount++;
+      }
+      
+      if (newGamesCount > 0) {
+        console.log(`📤 Posted ${newGamesCount} new games to guild ${guild.guildId}`);
       }
     }
     
-    if (newGamesCount > 0) {
+    if (postedGames.length > 0) {
       await savePostedGames(env, postedGames);
-      console.log(`💾 ${newGamesCount} new games saved`);
     }
     
   } catch (error) {
@@ -417,199 +535,307 @@ async function checkAndPostFreeGames(env: Env): Promise<void> {
   }
 }
 
-/**
- * Sendet Embed in einen Discord Channel oder Thread
- */
-async function sendToChannel(env: Env, channelId: string, embed: any, threadId?: string, mention?: string): Promise<boolean> {
+async function sendToChannel(env: Env, channelId: string, embed: any, mentions?: string): Promise<boolean> {
   try {
-    const targetId = threadId || channelId;
-    const content = mention || undefined;
+    const payload: any = { embeds: [embed] };
+    if (mentions) {
+      payload.content = mentions;
+    }
     
-    const response = await fetch(`https://discord.com/api/v10/channels/${targetId}/messages`, {
+    const response = await fetch(`https://discord.com/api/v10/channels/${channelId}/messages`, {
       method: 'POST',
       headers: {
         'Authorization': `Bot ${env.DISCORD_BOT_TOKEN}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ 
-        content,
-        embeds: [embed],
-        allowed_mentions: { parse: ['roles'] }
-      })
+      body: JSON.stringify(payload)
     });
     
     if (!response.ok) {
-      console.error(`Error sending to channel ${targetId}:`, await response.text());
+      console.error(`Error sending to channel ${channelId}:`, await response.text());
       return false;
     }
     
     return true;
   } catch (error) {
-    console.error('Send error:', error);
+    console.error('Error sending message:', error);
     return false;
   }
 }
 
-/**
- * Epic Games Store
- */
+async function getFreeGamesForStore(store: StoreType): Promise<Game[] | null> {
+  switch (store) {
+    case 'epic':
+      return getEpicGames();
+    case 'steam':
+      return getSteamGames();
+    case 'gog':
+      return getGOGGames();
+    case 'ubisoft':
+      return getUbisoftGames();
+    default:
+      return null;
+  }
+}
+
 async function getEpicGames(): Promise<Game[] | null> {
-  const url = 'https://store-site-backend-static.ak.epicgames.com/freeGamesPromotions?locale=en&country=US&allowCountries=US,DE';
+  const url = 'https://store-site-backend-static.ak.epicgames.com/freeGamesPromotions?locale=en&country=US&allowCountries=US';
   
   try {
     const response = await fetch(url, {
       headers: { 'User-Agent': 'Mozilla/5.0' }
     });
     
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    
+    const data = await response.json();
+    return parseEpicGames(data);
+  } catch (error) {
+    console.error('Error fetching Epic games:', error);
+    return null;
+  }
+}
+
+function parseEpicGames(data: any): Game[] {
+  const freeGames: Game[] = [];
+  
+  if (!data?.data?.Catalog?.searchStore?.elements) return freeGames;
+  
+  const games = data.data.Catalog.searchStore.elements;
+  
+  for (const game of games) {
+    const isFree = game.price?.totalPrice?.discountPrice === 0;
+    const hasPromotion = game.promotions?.promotionalOffers?.[0]?.promotionalOffers?.[0];
+    
+    if (isFree && hasPromotion) {
+      const offer = game.promotions.promotionalOffers[0].promotionalOffers[0];
+      
+      let imageUrl: string | null = null;
+      const images = game.keyImages || [];
+      for (const img of images) {
+        if (img.type === 'DieselStoreFrontWide' || img.type === 'OfferImageWide') {
+          imageUrl = img.url;
+          break;
+        }
+      }
+      
+      const slug = game.productSlug || game.urlSlug;
+      if (!slug) continue;
+      
+      const originalPrice = game.price?.totalPrice?.originalPrice || 0;
+      
+      freeGames.push({
+        id: game.id,
+        store: 'epic',
+        title: game.title,
+        description: game.description || 'No description available',
+        startDate: offer.startDate,
+        endDate: offer.endDate,
+        url: `https://store.epicgames.com/en-US/p/${slug}`,
+        image: imageUrl,
+        price: {
+          original: originalPrice / 100,
+          discount: 100,
+          currency: 'USD'
+        }
+      });
+    }
+  }
+  
+  return freeGames;
+}
+
+async function getSteamGames(): Promise<Game[] | null> {
+  // Using SteamDB's free promotions API (unofficial)
+  try {
+    const response = await fetch('https://steamdb.info/api/GetFreebies/', {
+      headers: { 
+        'User-Agent': 'Mozilla/5.0',
+        'Accept': 'application/json'
+      }
+    });
+    
+    if (!response.ok) {
+      // Fallback: Check Steam's own API for common free games
+      return getSteamFallback();
+    }
+    
+    const data = await response.json();
+    return parseSteamGames(data);
+  } catch (error) {
+    console.error('Error fetching Steam games:', error);
+    return getSteamFallback();
+  }
+}
+
+async function getSteamFallback(): Promise<Game[] | null> {
+  // Fallback method: Check specific app IDs that are known to have promotions
+  // This would need to be expanded with a proper Steam API implementation
+  const freeGames: Game[] = [];
+  
+  try {
+    // Check Steam's featured items
+    const response = await fetch('https://store.steampowered.com/api/featured/');
     if (!response.ok) return null;
     
     const data = await response.json();
-    const games: Game[] = [];
     
-    if (!data?.data?.Catalog?.searchStore?.elements) return games;
-    
-    for (const game of data.data.Catalog.searchStore.elements) {
-      const isFree = game.price?.totalPrice?.discountPrice === 0;
-      const hasPromotion = game.promotions?.promotionalOffers?.[0]?.promotionalOffers?.[0];
-      
-      if (isFree && hasPromotion) {
-        const offer = game.promotions.promotionalOffers[0].promotionalOffers[0];
-        const originalPrice = game.price?.totalPrice?.originalPrice;
-        
-        let imageUrl: string | null = null;
-        const images = game.keyImages || [];
-        for (const img of images) {
-          if (img.type === 'DieselStoreFrontWide' || img.type === 'OfferImageWide') {
-            imageUrl = img.url;
-            break;
+    // Look for free games in featured categories
+    if (data.specials?.items) {
+      for (const item of data.specials.items) {
+        if (item.discount_percent === 100) {
+          const details = await getSteamAppDetails(item.id);
+          if (details) {
+            freeGames.push(details);
           }
         }
-        
-        const slug = game.productSlug || game.urlSlug;
-        if (!slug) continue;
-        
-        games.push({
-          id: game.id,
-          title: game.title,
-          description: game.description || 'No description available',
-          startDate: offer.startDate,
-          endDate: offer.endDate,
-          url: `https://store.epicgames.com/en-US/p/${slug}`,
-          image: imageUrl,
-          store: 'epic',
-          originalPrice: originalPrice ? `$${(originalPrice / 100).toFixed(2)}` : undefined,
-          currentPrice: 'FREE'
-        });
       }
     }
-    
-    return games;
   } catch (error) {
-    console.error('Epic Games error:', error);
-    return null;
+    console.error('Steam fallback error:', error);
   }
+  
+  return freeGames.length > 0 ? freeGames : null;
 }
 
-/**
- * Steam Store (via SteamDB API oder eigenes Scraping)
- */
-async function getSteamGames(): Promise<Game[] | null> {
+async function getSteamAppDetails(appId: number): Promise<Game | null> {
   try {
-    // Hinweis: SteamDB hat keine offizielle API. Alternative: Steam Web API + Curated List
-    // Hier ein vereinfachtes Beispiel - in Produktion würde man eine dedizierte Quelle nutzen
-    const response = await fetch('https://steamdb.info/upcoming/free/', {
-      headers: { 'User-Agent': 'Mozilla/5.0' }
-    });
-    
+    const response = await fetch(`https://store.steampowered.com/api/appdetails?appids=${appId}`);
     if (!response.ok) return null;
     
-    // Parsing würde hier erfolgen - als Platzhalter:
-    const games: Game[] = [];
+    const data = await response.json();
+    const gameData = data[appId]?.data;
     
-    // TODO: Implementiere Steam Web API Integration oder SteamDB Scraping
+    if (!gameData) return null;
     
-    return games;
+    // Only return if it's truly free to keep (not F2P)
+    if (gameData.is_free && gameData.type === 'game') {
+      return {
+        id: appId.toString(),
+        store: 'steam',
+        title: gameData.name,
+        description: gameData.short_description || 'No description available',
+        startDate: new Date().toISOString(),
+        endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // Default 7 days
+        url: `https://store.steampowered.com/app/${appId}`,
+        image: gameData.header_image,
+        price: {
+          original: gameData.price_overview?.initial || 0,
+          discount: 100,
+          currency: gameData.price_overview?.currency || 'USD'
+        },
+        rating: gameData.metacritic?.score ? {
+          score: gameData.metacritic.score,
+          count: 0
+        } : undefined
+      };
+    }
+    
+    return null;
   } catch (error) {
-    console.error('Steam error:', error);
+    console.error(`Error fetching Steam app ${appId}:`, error);
     return null;
   }
 }
 
-/**
- * GOG Store
- */
+function parseSteamGames(data: any): Game[] {
+  const freeGames: Game[] = [];
+  
+  if (!data?.data) return freeGames;
+  
+  for (const item of data.data) {
+    if (item.type === 'game' && item.discount === 100) {
+      freeGames.push({
+        id: item.appid.toString(),
+        store: 'steam',
+        title: item.name,
+        description: item.description || 'No description available',
+        startDate: new Date(item.start * 1000).toISOString(),
+        endDate: new Date(item.end * 1000).toISOString(),
+        url: `https://store.steampowered.com/app/${item.appid}`,
+        image: item.image,
+        price: {
+          original: item.original_price || 0,
+          discount: 100,
+          currency: 'USD'
+        }
+      });
+    }
+  }
+  
+  return freeGames;
+}
+
 async function getGOGGames(): Promise<Game[] | null> {
   try {
-    const response = await fetch('https://www.gog.com/games/ajax/filtered?mediaType=game&price=free', {
+    const response = await fetch('https://www.gog.com/games/ajax/filtered?mediaType=game&price=free&sort=popularity', {
       headers: { 'User-Agent': 'Mozilla/5.0' }
     });
     
     if (!response.ok) return null;
     
     const data = await response.json();
-    const games: Game[] = [];
-    
-    // Parse GOG free games
-    if (data.products) {
-      for (const product of data.products) {
-        if (product.price.isFree) {
-          games.push({
-            id: product.id.toString(),
-            title: product.title,
-            description: product.description || 'No description available',
-            startDate: new Date().toISOString(),
-            endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-            url: `https://www.gog.com${product.url}`,
-            image: product.image || null,
-            store: 'gog',
-            originalPrice: product.price.baseAmount || undefined,
-            currentPrice: 'FREE',
-            rating: product.rating || undefined
-          });
-        }
-      }
+    return parseGOGGames(data);
+  } catch (error) {
+    console.error('Error fetching GOG games:', error);
+    return null;
+  }
+}
+
+function parseGOGGames(data: any): Game[] {
+  const freeGames: Game[] = [];
+  
+  if (!data?.products) return freeGames;
+  
+  const now = Date.now();
+  
+  for (const game of data.products) {
+    // Check if it's a promotional free game (not permanently free)
+    if (game.price?.isFree && game.price?.discount > 0) {
+      freeGames.push({
+        id: game.id.toString(),
+        store: 'gog',
+        title: game.title,
+        description: game.description || 'No description available',
+        startDate: new Date(now).toISOString(),
+        endDate: new Date(now + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        url: `https://www.gog.com${game.url}`,
+        image: game.image ? `https:${game.image}_product_card_v2_mobile_slider_639.jpg` : null,
+        price: {
+          original: game.price?.baseAmount || 0,
+          discount: game.price?.discount || 100,
+          currency: 'USD'
+        },
+        rating: game.rating ? {
+          score: Math.round(game.rating * 10),
+          count: game.votesCount || 0
+        } : undefined
+      });
     }
-    
-    return games;
-  } catch (error) {
-    console.error('GOG error:', error);
-    return null;
   }
+  
+  return freeGames;
 }
 
-/**
- * Ubisoft Connect
- */
 async function getUbisoftGames(): Promise<Game[] | null> {
-  try {
-    // Ubisoft hat keine öffentliche API - würde Scraping oder Newsletter-Parsing erfordern
-    const games: Game[] = [];
-    
-    // TODO: Implementiere Ubisoft Connect Integration
-    
-    return games;
-  } catch (error) {
-    console.error('Ubisoft error:', error);
-    return null;
-  }
+  // Ubisoft doesn't have a public API for free games
+  // This would require web scraping or manual tracking
+  // For now, returning null - can be implemented with scraping
+  return null;
 }
 
-/**
- * Erstellt Discord Embed mit allen Details
- */
-function createEmbed(game: Game, config: GuildConfig): any {
-  const store = storeInfo[game.store];
+function createEmbed(game: Game, t: any, lang: Language): any {
   const endTimestamp = Math.floor(new Date(game.endDate).getTime() / 1000);
   
   const embed: any = {
-    title: `${store.icon} ${game.title} - ${t(config, 'free').toUpperCase()}!`,
-    description: game.description.substring(0, 400) + (game.description.length > 400 ? '...' : ''),
-    color: store.color,
+    title: `${storeEmojis[game.store]} ${game.title} - ${t.free_title}`,
+    description: game.description.substring(0, 500) + (game.description.length > 500 ? '...' : ''),
+    color: storeColors[game.store],
     url: game.url,
     fields: [],
     footer: { 
-      text: `${store.name} • ${t(config, 'footer')}`,
-      icon_url: getStoreIconUrl(game.store)
+      text: `${storeNames[game.store]} • ${t.store_footer}`,
+      icon_url: getStoreIcon(game.store)
     },
     timestamp: new Date().toISOString()
   };
@@ -618,65 +844,105 @@ function createEmbed(game: Game, config: GuildConfig): any {
     embed.image = { url: game.image };
   }
   
-  // Verfügbar bis (als Discord Timestamp)
+  // Available until (Discord timestamp)
   embed.fields.push({
-    name: t(config, 'available_until'),
+    name: t.available_until,
     value: `<t:${endTimestamp}:F> (<t:${endTimestamp}:R>)`,
     inline: false
   });
   
-  // Originalpreis
-  if (game.originalPrice) {
+  // Original price
+  if (game.price && game.price.original > 0) {
+    const priceFormatted = new Intl.NumberFormat(getLocaleForLanguage(lang), {
+      style: 'currency',
+      currency: game.price.currency
+    }).format(game.price.original);
+    
     embed.fields.push({
-      name: t(config, 'original_price'),
-      value: `~~${game.originalPrice}~~ → **FREE**`,
+      name: t.original_price,
+      value: `~~${priceFormatted}~~ **FREE** (-${game.price.discount}%)`,
       inline: true
     });
   }
   
-  // Bewertung
+  // Rating
   if (game.rating) {
-    const stars = '⭐'.repeat(Math.round(game.rating / 20));
+    const stars = '⭐'.repeat(Math.round(game.rating.score / 20));
+    const ratingText = `${stars} ${game.rating.score}/100`;
+    const countText = game.rating.count > 0 ? ` (${game.rating.count.toLocaleString()} ${lang === 'de' ? 'Bewertungen' : 'reviews'})` : '';
+    
     embed.fields.push({
-      name: t(config, 'rating'),
-      value: `${stars} ${game.rating}%${game.reviewCount ? ` (${game.reviewCount.toLocaleString()})` : ''}`,
+      name: t.rating,
+      value: ratingText + countText,
       inline: true
     });
   }
   
-  // Tags
-  if (game.tags && game.tags.length > 0) {
-    embed.fields.push({
-      name: '🏷️ Tags',
-      value: game.tags.slice(0, 5).join(', '),
-      inline: false
-    });
-  }
-  
-  // Links
-  const launcherUrl = game.url.replace('/web/', '/app/');
+  // Get now links
+  const links = getStoreLinks(game.store, game.url);
   embed.fields.push({
-    name: t(config, 'get_now'),
-    value: `[${t(config, 'store_page')}](${game.url})${launcherUrl !== game.url ? ` • [${t(config, 'launcher')}](${launcherUrl})` : ''}`,
+    name: t.get_now,
+    value: links,
     inline: false
   });
   
   return embed;
 }
 
-function getStoreIconUrl(store: Store): string {
-  const icons: Record<Store, string> = {
-    epic: 'https://cdn2.unrealengine.com/Epic+Games+Node%2Fxlarge_whitetext_blackback_epiclogo_504x512_1529964470588-503x512-ac795e81c54b27aaa2e196456dd307bfe4ca3ca4.jpg',
-    steam: 'https://cdn.cloudflare.steamstatic.com/steamcommunity/public/images/avatars/1b/1b21ae81ba6e44e5c564c7044b95f4c3f3e81a18_full.jpg',
-    gog: 'https://images.gog-statics.com/5c09a2b0f55e4f4eea260ec77a5bb48f8f5dbe2e8f77e3a6f2e09e9b61e0eadb_256.png',
-    ubisoft: 'https://staticctf.akamaized.net/J3yJr34U2pZ2Ieem48Dwy9uqj5PNUQTn/5Y6vBNTBiWm1TJfxZvW9O4/e7c66e9f0c3e0d3c4c0c0a3e3d0e3c0e/ubi_logo.png'
+function getStoreIcon(store: StoreType): string {
+  const icons: Record<StoreType, string> = {
+    epic: 'https://cdn2.unrealengine.com/epic-games-logo-500x500-500x500-3e72e23ebbf2.png',
+    steam: 'https://cdn.cloudflare.steamstatic.com/steamcommunity/public/images/avatars/c5/c5d1b456e4c155f2e3f9c08f06b3d5210d2aba1a_full.jpg',
+    gog: 'https://images.gog-statics.com/3e1d0e5a7e608447cba20c1c3b03f1a10ee8a0ec3c8b05ca3eb6c6922c0287d6_glx_logo_gog.png',
+    ubisoft: 'https://staticctf.ubisoft.com/J3yJr34U2pZ2Ieem48Dwy9uqj5PNUQTn/4QKg5jIUI1HJAXaSqEUz1I/8d4e9a45c8b97e61c5cdeae97f93f359/ubi_logo.png'
   };
   return icons[store];
 }
 
-// KV Storage Funktionen
-async function saveGuildConfig(env: Env, config: GuildConfig): Promise<void> {
-  await env.GUILD_CONFIGS.put(config.guildId, JSON.stringify(config));
+function getStoreLinks(store: StoreType, url: string): string {
+  switch (store) {
+    case 'epic':
+      return `[Website](${url}) • [Launcher](${url.replace('/p/', '/app/')})`;
+    case 'steam':
+      return `[Website](${url}) • [Client](steam://store/${url.match(/\/app\/(\d+)/)?.[1]})`;
+    case 'gog':
+      return `[Website](${url}) • [Galaxy](goggalaxy://openGameView/${url.match(/\/game\/([^\/]+)/)?.[1]})`;
+    case 'ubisoft':
+      return `[Website](${url})`;
+    default:
+      return `[Website](${url})`;
+  }
+}
+
+function getLocaleForLanguage(lang: Language): string {
+  const locales: Record<Language, string> = {
+    en: 'en-US',
+    de: 'de-DE',
+    fr: 'fr-FR',
+    es: 'es-ES',
+    it: 'it-IT',
+    pt: 'pt-PT',
+    ru: 'ru-RU',
+    pl: 'pl-PL'
+  };
+  return locales[lang];
+}
+
+// Guild Config Management
+async function saveGuildConfig(env: Env, guildId: string, channelId: string, threadId?: string): Promise<void> {
+  const existing = await getGuildConfig(env, guildId);
+  const config: GuildConfig = {
+    guildId,
+    channelId,
+    threadId,
+    enabled: true,
+    language: existing?.language || 'en',
+    stores: existing?.stores || ['epic', 'steam'],
+    mentionRoles: existing?.mentionRoles || [],
+    separateThreads: existing?.separateThreads || false,
+    storeThreads: existing?.storeThreads || {}
+  };
+  await env.GUILD_CONFIGS.put(guildId, JSON.stringify(config));
 }
 
 async function getGuildConfig(env: Env, guildId: string): Promise<GuildConfig | null> {
@@ -688,6 +954,55 @@ async function disableGuild(env: Env, guildId: string): Promise<void> {
   const config = await getGuildConfig(env, guildId);
   if (config) {
     config.enabled = false;
+    await env.GUILD_CONFIGS.put(guildId, JSON.stringify(config));
+  }
+}
+
+async function updateLanguage(env: Env, guildId: string, language: Language): Promise<void> {
+  const config = await getGuildConfig(env, guildId);
+  if (config) {
+    config.language = language;
+    await env.GUILD_CONFIGS.put(guildId, JSON.stringify(config));
+  }
+}
+
+async function updateStores(env: Env, guildId: string, stores: StoreType[]): Promise<void> {
+  const config = await getGuildConfig(env, guildId);
+  if (config) {
+    config.stores = stores;
+    await env.GUILD_CONFIGS.put(guildId, JSON.stringify(config));
+  }
+}
+
+async function addMentionRole(env: Env, guildId: string, roleId: string): Promise<void> {
+  const config = await getGuildConfig(env, guildId);
+  if (config && !config.mentionRoles.includes(roleId)) {
+    config.mentionRoles.push(roleId);
+    await env.GUILD_CONFIGS.put(guildId, JSON.stringify(config));
+  }
+}
+
+async function removeMentionRole(env: Env, guildId: string, roleId: string): Promise<void> {
+  const config = await getGuildConfig(env, guildId);
+  if (config) {
+    config.mentionRoles = config.mentionRoles.filter(r => r !== roleId);
+    await env.GUILD_CONFIGS.put(guildId, JSON.stringify(config));
+  }
+}
+
+async function setSeparateThreads(env: Env, guildId: string, enabled: boolean): Promise<void> {
+  const config = await getGuildConfig(env, guildId);
+  if (config) {
+    config.separateThreads = enabled;
+    await env.GUILD_CONFIGS.put(guildId, JSON.stringify(config));
+  }
+}
+
+async function setStoreThread(env: Env, guildId: string, store: StoreType, threadId: string): Promise<void> {
+  const config = await getGuildConfig(env, guildId);
+  if (config) {
+    if (!config.storeThreads) config.storeThreads = {};
+    config.storeThreads[store] = threadId;
     await env.GUILD_CONFIGS.put(guildId, JSON.stringify(config));
   }
 }
@@ -706,22 +1021,23 @@ async function getAllGuildConfigs(env: Env): Promise<GuildConfig[]> {
   return configs;
 }
 
+// Posted Games Management
 async function loadPostedGames(env: Env): Promise<string[]> {
   try {
     const data = await env.POSTED_GAMES.get('games', 'json');
     return (data as string[]) || [];
   } catch (error) {
-    console.error('Load error:', error);
+    console.error('Error loading posted games:', error);
     return [];
   }
 }
 
 async function savePostedGames(env: Env, games: string[]): Promise<void> {
   try {
-    // Behalte nur die letzten 500 Spiele
+    // Keep last 500 games to prevent unlimited growth
     const gamesToStore = games.slice(-500);
     await env.POSTED_GAMES.put('games', JSON.stringify(gamesToStore));
   } catch (error) {
-    console.error('Save error:', error);
+    console.error('Error saving posted games:', error);
   }
 }
