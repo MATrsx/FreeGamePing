@@ -602,13 +602,13 @@ async function checkAndPostFreeGames(env: Env): Promise<void> {
       
       if (newGamesCount > 0) {
         console.log(`📤 Posted ${newGamesCount} new games to guild ${guild.guildId}`);
-      } else {
-        console.log(`💤 No new games found for guild ${guild.guildId}`);
       }
     }
     
     if (postedGames.length > 0) {
       await savePostedGames(env, postedGames);
+    } else {
+      console.log('ℹ️  No new games found.');
     }
     
   } catch (error) {
