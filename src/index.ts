@@ -275,13 +275,6 @@ const translations: Record<Language, any> = {
   },
 };
 
-const storeEmojis: Record<StoreType, string> = {
-  epic: '🎮',
-  steam: '🚂',
-  gog: '🎯',
-  ubisoft: '🎪'
-};
-
 const storeNames: Record<StoreType, string> = {
   epic: 'Epic Games Store',
   steam: 'Steam',
@@ -297,7 +290,7 @@ const storeColors: Record<StoreType, number> = {
 };
 
 export default {
-  async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
+  async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
     ctx.waitUntil(checkAndPostFreeGames(env));
   },
 
@@ -376,43 +369,114 @@ async function handleCommand(interaction: any, env: Env, ctx: ExecutionContext):
   }
 
   switch (name) {
-    case 'setup':
+    case 'setup': {
       const channelOption = options?.find((o: any) => o.name === 'channel');
       const threadOption = options?.find((o: any) => o.name === 'thread');
       const channelId = channelOption?.value || interaction.channel_id;
       const threadId = threadOption?.value;
-      
+    
       await saveGuildConfig(env, guildId, channelId, threadId);
-      
-      if (threadId) {
-        responseContent = `${t.setup_thread_success} <#${threadId}>`;
-      } else {
-        responseContent = `${t.setup_success} <#${channelId}>`;
-      }
-      break;
+    
+      const embed = {
+        title: "🚀 " + t.setup_success,
+        description: threadId
+          ? `${t.setup_thread_success} <#${threadId}>`
+          : `${t.setup_success} <#${channelId}>`,
+        color: 0x00ff99,
+        fields: [
+          {
+            name: "📦 " + t.status_stores,
+            value: "`epic`",
+            inline: true
+          },
+          {
+            name: "🌍 " + t.status_language,
+            value: "`" + (config?.language ?? "en") + "`",
+            inline: true
+          },
+          {
+            name: "🧵 Threads",
+            value: threadId ? `<#${threadId}>` : "—",
+            inline: true
+          }
+        ],
+        footer: { text: "Free Games Bot" },
+        timestamp: new Date().toISOString()
+      };
+    
+      return new Response(JSON.stringify({
+        type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+        data: { embeds: [embed], flags: 64 }
+      }), { headers: { "Content-Type": "application/json" } });
+    }
       
     case 'disable':
       await disableGuild(env, guildId);
       responseContent = t.disabled;
       break;
-      
-    case 'status':
-      const statusConfig = await getGuildConfig(env, guildId);
-      if (statusConfig && statusConfig.enabled) {
-        const channelMention = statusConfig.threadId 
-          ? `<#${statusConfig.threadId}>` 
-          : `<#${statusConfig.channelId}>`;
-        responseContent = `${t.status_active} ${channelMention}\n\n`;
-        responseContent += `${t.status_language}: ${statusConfig.language}\n`;
-        responseContent += `${t.status_stores}: ${statusConfig.stores.map(s => storeEmojis[s] + ' ' + storeNames[s]).join(', ')}\n`;
-        
-        if (statusConfig.mentionRoles.length > 0) {
-          responseContent += `${t.status_roles}: ${statusConfig.mentionRoles.map(r => `<@&${r}>`).join(', ')}`;
-        }
-      } else {
-        responseContent = t.status_inactive;
+    
+    case 'status': {
+      if (!config || !config.enabled) {
+        const embed = {
+          title: "❌ " + t.status_inactive,
+          description: t.status_inactive,
+          color: 0xff5555,
+          footer: { text: "Free Games Bot" }
+        };
+    
+        return new Response(JSON.stringify({
+          type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+          data: { embeds: [embed], flags: 64 }
+        }), { headers: { "Content-Type": "application/json" } });
       }
-      break;
+    
+      const channelMention = config.threadId
+        ? `<#${config.threadId}>`
+        : `<#${config.channelId}>`;
+    
+      const embed = {
+        title: "📊 " + t.status_active,
+        description: `${t.status_active} ${channelMention}`,
+        color: 0x0099ff,
+        fields: [
+          {
+            name: "🌍 " + t.status_language,
+            value: "`" + config.language + "`",
+            inline: true
+          },
+          {
+            name: "📦 " + t.status_stores,
+            value: config.stores
+              .map(s => `${getStoreIcon(s)} ${storeNames[s]}`)
+              .join("\n"),
+            inline: true
+          },
+          {
+            name: "👥 " + t.status_roles,
+            value: config.mentionRoles.length > 0
+              ? config.mentionRoles.map(r => `<@&${r}>`).join(", ")
+              : "—",
+            inline: false
+          },
+          {
+            name: "🧵 Threads",
+            value: config.separateThreads
+              ? Object.entries(config.storeThreads)
+                  .map(([store, thread]) => `${getStoreIcon(store as StoreType)} <#${thread}>`)
+                  .join("\n") || "—"
+              : "—",
+            inline: false
+          }
+        ],
+        footer: { text: "Free Games Bot" },
+        timestamp: new Date().toISOString()
+      };
+    
+      return new Response(JSON.stringify({
+        type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+        data: { embeds: [embed], flags: 64 }
+      }), { headers: { "Content-Type": "application/json" } });
+    }
       
     case 'language':
       const newLang = options?.[0]?.value as Language;
@@ -423,7 +487,7 @@ async function handleCommand(interaction: any, env: Env, ctx: ExecutionContext):
     case 'stores':
       const stores = options?.[0]?.value?.split(',').map((s: string) => s.trim() as StoreType) || [];
       await updateStores(env, guildId, stores);
-      responseContent = `${t.stores_updated}: ${stores.map(s => storeEmojis[s] + ' ' + storeNames[s]).join(', ')}`;
+      responseContent = `${t.stores_updated}: ${stores.map(s => getStoreIcon(s) + ' ' + storeNames[s]).join(', ')}`;
       break;
       
     case 'role':
@@ -449,7 +513,7 @@ async function handleCommand(interaction: any, env: Env, ctx: ExecutionContext):
       const store = options?.find((o: any) => o.name === 'store')?.value as StoreType;
       const thread = options?.find((o: any) => o.name === 'thread')?.value;
       await setStoreThread(env, guildId, store, thread);
-      responseContent = `${t.thread_configured} ${storeEmojis[store]} ${storeNames[store]}: <#${thread}>`;
+      responseContent = `${t.thread_configured} ${getStoreIcon(store)} ${storeNames[store]}: <#${thread}>`;
       break;
       
     case 'check':
@@ -502,10 +566,10 @@ async function checkAndPostFreeGames(env: Env): Promise<void> {
   try {
     const guilds = await getAllGuildConfigs(env);
     const postedGames = await loadPostedGames(env);
+    let newGamesCount = 0;
     
     for (const guild of guilds.filter(g => g.enabled)) {
       const t = translations[guild.language];
-      let newGamesCount = 0;
       
       for (const store of guild.stores) {
         const games = await getFreeGamesForStore(store);
@@ -543,6 +607,9 @@ async function checkAndPostFreeGames(env: Env): Promise<void> {
     
     if (postedGames.length > 0) {
       await savePostedGames(env, postedGames);
+    } 
+    if (newGamesCount === 0) {
+      console.log('ℹ️  No new games found.');
     }
     
   } catch (error) {
@@ -843,7 +910,7 @@ function createEmbed(game: Game, t: any, lang: Language): any {
   const endTimestamp = Math.floor(new Date(game.endDate).getTime() / 1000);
   
   const embed: any = {
-    title: `${storeEmojis[game.store]} ${game.title} - ${t.free_title}`,
+    title: `🎁 ${game.title} - ${t.free_title}`,
     description: game.description.substring(0, 500) + (game.description.length > 500 ? '...' : ''),
     color: storeColors[game.store],
     url: game.url,
@@ -894,7 +961,7 @@ function createEmbed(game: Game, t: any, lang: Language): any {
   }
   
   // Get now links
-  const links = getStoreLinks(game.store, game.url);
+  const links = getStoreLinks(game);
   embed.fields.push({
     name: t.get_now,
     value: links,
@@ -906,26 +973,26 @@ function createEmbed(game: Game, t: any, lang: Language): any {
 
 function getStoreIcon(store: StoreType): string {
   const icons: Record<StoreType, string> = {
-    epic: 'https://cdn2.unrealengine.com/epic-games-logo-500x500-500x500-3e72e23ebbf2.png',
-    steam: 'https://cdn.cloudflare.steamstatic.com/steamcommunity/public/images/avatars/c5/c5d1b456e4c155f2e3f9c08f06b3d5210d2aba1a_full.jpg',
-    gog: 'https://images.gog-statics.com/3e1d0e5a7e608447cba20c1c3b03f1a10ee8a0ec3c8b05ca3eb6c6922c0287d6_glx_logo_gog.png',
-    ubisoft: 'https://staticctf.ubisoft.com/J3yJr34U2pZ2Ieem48Dwy9uqj5PNUQTn/4QKg5jIUI1HJAXaSqEUz1I/8d4e9a45c8b97e61c5cdeae97f93f359/ubi_logo.png'
+    epic: 'https://cdn.brandfetch.io/idjxHPThVp/w/800/h/929/theme/dark/logo.png?c=1bxid64Mup7aczewSAYMX&t=1667655482104',
+    steam: 'https://images.seeklogo.com/logo-png/27/1/steam-logo-png_seeklogo-270306.png',
+    gog: 'https://cdn.brandfetch.io/idKvjVxYV6/w/128/h/128/theme/dark/logo.png?c=1bxid64Mup7aczewSAYMX&t=1761868104778',
+    ubisoft: 'https://cdn.brandfetch.io/idtVsonT9X/w/800/h/831/theme/dark/symbol.png?c=1bxid64Mup7aczewSAYMX&t=1717149829878'
   };
   return icons[store];
 }
 
-function getStoreLinks(store: StoreType, url: string): string {
-  switch (store) {
+function getStoreLinks(game: Game): string {
+  switch (game.store) {
     case 'epic':
-      return `[Website](${url}) • [Launcher](${url.replace('/p/', '/app/')})`;
+      return `[Website](${game.url}) • [Launcher](https://epicfreegames.net/r/app/${game.id})`;
     case 'steam':
-      return `[Website](${url}) • [Client](steam://store/${url.match(/\/app\/(\d+)/)?.[1]})`;
+      return `[Website](${game.url}) • [Client](steam://store/${game.url.match(/\/app\/(\d+)/)?.[1]})`;
     case 'gog':
-      return `[Website](${url}) • [Galaxy](goggalaxy://openGameView/${url.match(/\/game\/([^\/]+)/)?.[1]})`;
+      return `[Website](${game.url}) • [Galaxy](goggalaxy://openGameView/${game.url.match(/\/game\/([^\/]+)/)?.[1]})`;
     case 'ubisoft':
-      return `[Website](${url})`;
+      return `[Website](${game.url})`;
     default:
-      return `[Website](${url})`;
+      return `[Website](${game.url})`;
   }
 }
 
