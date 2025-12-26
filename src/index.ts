@@ -607,7 +607,8 @@ async function checkAndPostFreeGames(env: Env): Promise<void> {
     
     if (postedGames.length > 0) {
       await savePostedGames(env, postedGames);
-    } else if (newGamesCount === 0) {
+    } 
+    if (newGamesCount === 0) {
       console.log('ℹ️  No new games found.');
     }
     
