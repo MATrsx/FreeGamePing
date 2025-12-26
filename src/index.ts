@@ -40,21 +40,13 @@ interface DiscordEmbed {
 import { verifyKey } from 'discord-interactions';
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const signature = request.headers.get("X-Signature-Ed25519");
     const timestamp = request.headers.get("X-Signature-Timestamp");
     const body = await request.text();
 
-    const isValid = verifyKey(
-      body,
-      signature,
-      timestamp,
-      env.DISCORD_PUBLIC_KEY
-    );
-
-    if (!isValid) {
-      return new Response("invalid request signature", { status: 401 });
-    }
+    const isValid = verifyKey(body, signature, timestamp, env.DISCORD_PUBLIC_KEY);
+    if (!isValid) return new Response("invalid request signature", { status: 401 });
 
     const json = JSON.parse(body);
 
@@ -64,15 +56,31 @@ export default {
         headers: { "Content-Type": "application/json" },
       });
     }
-    await checkAndPostFreeGames(env);
+
+    // Slash Command
+    if (json.type === 2) {
+      // Hintergrundarbeit starten
+      ctx.waitUntil(checkAndPostFreeGames(env));
+
+      // Sofortige Antwort an Discord
+      return new Response(JSON.stringify({
+        type: 4,
+        data: {
+          content: "🔍 Ich prüfe jetzt die kostenlosen Spiele!"
+        }
+      }), {
+        headers: { "Content-Type": "application/json" }
+      });
+    }
 
     return new Response("ok");
   },
 
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
     ctx.waitUntil(checkAndPostFreeGames(env));
-  },
+  }
 };
+
 
 /**
  * Hauptfunktion: Prüft auf kostenlose Spiele und postet neue
