@@ -602,6 +602,8 @@ async function checkAndPostFreeGames(env: Env): Promise<void> {
       
       if (newGamesCount > 0) {
         console.log(`📤 Posted ${newGamesCount} new games to guild ${guild.guildId}`);
+      } else {
+        console.log(`💤 No new games found for guild ${guild.guildId}`);
       }
     }
     
@@ -958,7 +960,7 @@ function createEmbed(game: Game, t: any, lang: Language): any {
   }
   
   // Get now links
-  const links = getStoreLinks(game.store, game.url);
+  const links = getStoreLinks(game);
   embed.fields.push({
     name: t.get_now,
     value: links,
@@ -978,18 +980,18 @@ function getStoreIcon(store: StoreType): string {
   return icons[store];
 }
 
-function getStoreLinks(store: StoreType, url: string): string {
-  switch (store) {
+function getStoreLinks(game: Game): string {
+  switch (game.store) {
     case 'epic':
-      return `[Website](${url}) • [Launcher](${url.replace('/p/', '/app/')})`;
+      return `[Website](${game.url}) • [Launcher](${game.url.split('/p/')[0] + '/app/' + game.id})`;
     case 'steam':
-      return `[Website](${url}) • [Client](steam://store/${url.match(/\/app\/(\d+)/)?.[1]})`;
+      return `[Website](${game.url}) • [Client](steam://store/${game.url.match(/\/app\/(\d+)/)?.[1]})`;
     case 'gog':
-      return `[Website](${url}) • [Galaxy](goggalaxy://openGameView/${url.match(/\/game\/([^\/]+)/)?.[1]})`;
+      return `[Website](${game.url}) • [Galaxy](goggalaxy://openGameView/${game.url.match(/\/game\/([^\/]+)/)?.[1]})`;
     case 'ubisoft':
-      return `[Website](${url})`;
+      return `[Website](${game.url})`;
     default:
-      return `[Website](${url})`;
+      return `[Website](${game.url})`;
   }
 }
 
