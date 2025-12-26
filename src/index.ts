@@ -1,7 +1,7 @@
 /**
  * Multi-Store Free Games Bot für Cloudflare Workers (TypeScript)
- * Unterstützt: Epic Games, Steam, GOG, Ubisoft Connect
- * Mit erweiterten Discord Features und Multi-Language Support
+ * Unterstützt: Epic Games, Steam, GOG, Itch.io
+ * Nutzt GamerPower API für alle Stores
  */
 
 import { verifyKey } from 'discord-interactions';
@@ -14,7 +14,7 @@ interface Env {
   DISCORD_APPLICATION_ID: string;
 }
 
-type StoreType = 'epic' | 'steam' | 'gog' | 'ubisoft';
+type StoreType = 'epic' | 'steam' | 'gog' | 'itchio';
 type Language = 'en' | 'de' | 'fr' | 'es' | 'it' | 'pt' | 'ru' | 'pl';
 
 interface GuildConfig {
@@ -49,6 +49,26 @@ interface Game {
     score: number;
     count: number;
   };
+  instructions?: string;
+}
+
+interface GamerPowerGame {
+  id: number;
+  title: string;
+  worth: string;
+  thumbnail: string;
+  image: string;
+  description: string;
+  instructions: string;
+  open_giveaway_url: string;
+  published_date: string;
+  type: string;
+  platforms: string;
+  end_date: string;
+  users: number;
+  status: string;
+  gamerpower_url: string;
+  open_giveaway: string;
 }
 
 // Discord Interaction Types
@@ -90,6 +110,8 @@ const translations: Record<Language, any> = {
     separate_threads_disabled: '✅ Separate threads disabled',
     thread_configured: '✅ Thread configured for',
     no_games: 'ℹ️ No free games found',
+    how_to_claim: '📋 How to claim',
+    users_claimed: '👥 Users claimed',
   },
   de: {
     setup_success: '✅ Bot eingerichtet! Kostenlose Spiele werden gepostet in',
@@ -116,6 +138,8 @@ const translations: Record<Language, any> = {
     separate_threads_disabled: '✅ Separate Threads deaktiviert',
     thread_configured: '✅ Thread konfiguriert für',
     no_games: 'ℹ️ Keine kostenlosen Spiele gefunden',
+    how_to_claim: '📋 So erhältst du es',
+    users_claimed: '👥 Nutzer haben es bereits',
   },
   fr: {
     setup_success: '✅ Bot configuré! Les jeux gratuits seront postés dans',
@@ -142,6 +166,8 @@ const translations: Record<Language, any> = {
     separate_threads_disabled: '✅ Fils séparés désactivés',
     thread_configured: '✅ Fil configuré pour',
     no_games: 'ℹ️ Aucun jeu gratuit trouvé',
+    how_to_claim: '📋 Comment réclamer',
+    users_claimed: '👥 Utilisateurs ont réclamé',
   },
   es: {
     setup_success: '✅ Bot configurado! Los juegos gratis se publicarán en',
@@ -168,6 +194,8 @@ const translations: Record<Language, any> = {
     separate_threads_disabled: '✅ Hilos separados desactivados',
     thread_configured: '✅ Hilo configurado para',
     no_games: 'ℹ️ No se encontraron juegos gratis',
+    how_to_claim: '📋 Cómo reclamar',
+    users_claimed: '👥 Usuarios han reclamado',
   },
   it: {
     setup_success: '✅ Bot configurato! I giochi gratis saranno pubblicati in',
@@ -194,6 +222,8 @@ const translations: Record<Language, any> = {
     separate_threads_disabled: '✅ Thread separati disabilitati',
     thread_configured: '✅ Thread configurato per',
     no_games: 'ℹ️ Nessun gioco gratuito trovato',
+    how_to_claim: '📋 Come rivendicare',
+    users_claimed: '👥 Utenti hanno rivendicato',
   },
   pt: {
     setup_success: '✅ Bot configurado! Jogos grátis serão postados em',
@@ -220,6 +250,8 @@ const translations: Record<Language, any> = {
     separate_threads_disabled: '✅ Tópicos separados desativados',
     thread_configured: '✅ Tópico configurado para',
     no_games: 'ℹ️ Nenhum jogo grátis encontrado',
+    how_to_claim: '📋 Como reivindicar',
+    users_claimed: '👥 Usuários reivindicaram',
   },
   ru: {
     setup_success: '✅ Бот настроен! Бесплатные игры будут публиковаться в',
@@ -246,6 +278,8 @@ const translations: Record<Language, any> = {
     separate_threads_disabled: '✅ Отдельные треды отключены',
     thread_configured: '✅ Тред настроен для',
     no_games: 'ℹ️ Бесплатные игры не найдены',
+    how_to_claim: '📋 Как получить',
+    users_claimed: '👥 Пользователи получили',
   },
   pl: {
     setup_success: '✅ Bot skonfigurowany! Darmowe gry będą publikowane w',
@@ -272,6 +306,8 @@ const translations: Record<Language, any> = {
     separate_threads_disabled: '✅ Osobne wątki wyłączone',
     thread_configured: '✅ Wątek skonfigurowany dla',
     no_games: 'ℹ️ Nie znaleziono darmowych gier',
+    how_to_claim: '📋 Jak odebrać',
+    users_claimed: '👥 Użytkownicy odebrali',
   },
 };
 
@@ -279,14 +315,21 @@ const storeNames: Record<StoreType, string> = {
   epic: 'Epic Games Store',
   steam: 'Steam',
   gog: 'GOG',
-  ubisoft: 'Ubisoft Connect'
+  itchio: 'Itch.io'
 };
 
 const storeColors: Record<StoreType, number> = {
-  epic: 0x0078F2,
-  steam: 0x171A21,
-  gog: 0x86328A,
-  ubisoft: 0x0080FF
+  epic: 0x121212,
+  steam: 0x66C0F4,
+  gog: 0xC10DE4,
+  itchio: 0xDE425C
+};
+
+const storePlatformNames: Record<StoreType, string> = {
+  epic: 'epic-games-store',
+  steam: 'steam',
+  gog: 'gog',
+  itchio: 'itchio'
 };
 
 export default {
@@ -297,12 +340,10 @@ export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     
-    // Discord Interactions Endpoint
     if (request.method === 'POST' && url.pathname === '/interactions') {
       return handleDiscordInteraction(request, env, ctx);
     }
     
-    // Manual check endpoint
     if (request.method === 'POST' && url.pathname === '/check') {
       await checkAndPostFreeGames(env);
       return new Response('Check completed', { status: 200 });
@@ -345,12 +386,10 @@ async function handleCommand(interaction: any, env: Env, ctx: ExecutionContext):
   const { name, options } = interaction.data;
   const guildId = interaction.guild_id;
   
-  // Get current config for language
   const config = await getGuildConfig(env, guildId);
   const lang = config?.language || 'en';
   const t = translations[lang];
 
-  // Commands that require setup
   const requiresSetup = ['status', 'check', 'stores', 'language', 'role', 'separate-threads', 'thread'];
   
   let responseContent = '';
@@ -386,7 +425,7 @@ async function handleCommand(interaction: any, env: Env, ctx: ExecutionContext):
         fields: [
           {
             name: "📦 " + t.status_stores,
-            value: "`epic`",
+            value: "`epic`, `steam`, `gog`, `itchio`",
             inline: true
           },
           {
@@ -447,7 +486,7 @@ async function handleCommand(interaction: any, env: Env, ctx: ExecutionContext):
           {
             name: "📦 " + t.status_stores,
             value: config.stores
-              .map(s => `${getStoreIcon(s)} ${storeNames[s]}`)
+              .map(s => `${getStoreEmoji(s)} ${storeNames[s]}`)
               .join("\n"),
             inline: true
           },
@@ -461,8 +500,8 @@ async function handleCommand(interaction: any, env: Env, ctx: ExecutionContext):
           {
             name: "🧵 Threads",
             value: config.separateThreads
-              ? Object.entries(config.storeThreads)
-                  .map(([store, thread]) => `${getStoreIcon(store as StoreType)} <#${thread}>`)
+              ? Object.entries(config.storeThreads || {})
+                  .map(([store, thread]) => `${getStoreEmoji(store as StoreType)} <#${thread}>`)
                   .join("\n") || "—"
               : "—",
             inline: false
@@ -487,7 +526,7 @@ async function handleCommand(interaction: any, env: Env, ctx: ExecutionContext):
     case 'stores':
       const stores = options?.[0]?.value?.split(',').map((s: string) => s.trim() as StoreType) || [];
       await updateStores(env, guildId, stores);
-      responseContent = `${t.stores_updated}: ${stores.map(s => getStoreIcon(s) + ' ' + storeNames[s]).join(', ')}`;
+      responseContent = `${t.stores_updated}: ${stores.map(s => getStoreEmoji(s) + ' ' + storeNames[s]).join(', ')}`;
       break;
       
     case 'role':
@@ -513,7 +552,7 @@ async function handleCommand(interaction: any, env: Env, ctx: ExecutionContext):
       const store = options?.find((o: any) => o.name === 'store')?.value as StoreType;
       const thread = options?.find((o: any) => o.name === 'thread')?.value;
       await setStoreThread(env, guildId, store, thread);
-      responseContent = `${t.thread_configured} ${getStoreIcon(store)} ${storeNames[store]}: <#${thread}>`;
+      responseContent = `${t.thread_configured} ${getStoreEmoji(store)} ${storeNames[store]}: <#${thread}>`;
       break;
       
     case 'check':
@@ -537,7 +576,7 @@ async function handleCommand(interaction: any, env: Env, ctx: ExecutionContext):
     type: deferred ? InteractionResponseType.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE : InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
     data: {
       content: responseContent,
-      flags: 64 // Ephemeral
+      flags: 64
     }
   };
   
@@ -585,7 +624,6 @@ async function checkAndPostFreeGames(env: Env): Promise<void> {
             const embed = createEmbed(game, t, guild.language);
             const mentions = guild.mentionRoles.map(r => `<@&${r}>`).join(' ');
             
-            // Determine target
             let targetId = guild.channelId;
             if (guild.separateThreads && guild.storeThreads?.[store]) {
               targetId = guild.storeThreads[store]!;
@@ -646,21 +684,81 @@ async function sendToChannel(env: Env, channelId: string, embed: any, mentions?:
 }
 
 async function getFreeGamesForStore(store: StoreType): Promise<Game[] | null> {
-  switch (store) {
-    case 'epic':
-      return getEpicGames();
-    case 'steam':
-      return getSteamGames();
-    case 'gog':
-      return getGOGGames();
-    case 'ubisoft':
-      return getUbisoftGames();
-    default:
+  const platform = storePlatformNames[store];
+  const url = `https://www.gamerpower.com/api/giveaways?platform=${platform}&type=game`;
+  
+  try {
+    const response = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0' }
+    });
+    
+    if (!response.ok) {
+      console.error(`Error fetching ${store} games:`, response.status);
       return null;
+    }
+    
+    const data: GamerPowerGame[] = await response.json();
+    
+    // For Epic Games, also fetch from Epic's official API for enhanced data
+    if (store === 'epic') {
+      const epicGames = await getEpicGamesOfficial();
+      if (epicGames && epicGames.length > 0) {
+        return mergeEpicGames(parseGamerPowerGames(data, store), epicGames);
+      }
+    }
+    
+    return parseGamerPowerGames(data, store);
+  } catch (error) {
+    console.error(`Error fetching ${store} games:`, error);
+    return null;
   }
 }
 
-async function getEpicGames(): Promise<Game[] | null> {
+function parseGamerPowerGames(data: GamerPowerGame[], store: StoreType): Game[] {
+  const games: Game[] = [];
+  
+  for (const item of data) {
+    if (item.type !== 'Game' || item.status === 'Expired') continue;
+    
+    let originalPrice = 0;
+    if (item.worth && item.worth !== 'N/A') {
+      const priceMatch = item.worth.match(/[\d.]+/);
+      if (priceMatch) {
+        originalPrice = parseFloat(priceMatch[0]);
+      }
+    }
+    
+    let endDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    if (item.end_date && item.end_date !== 'N/A') {
+      try {
+        endDate = new Date(item.end_date).toISOString();
+      } catch (e) {
+        console.error('Error parsing end date:', e);
+      }
+    }
+    
+    games.push({
+      id: item.id.toString(),
+      store,
+      title: item.title,
+      description: item.description || 'No description available',
+      startDate: item.published_date,
+      endDate,
+      url: item.open_giveaway_url || item.gamerpower_url,
+      image: item.image || item.thumbnail,
+      price: originalPrice > 0 ? {
+        original: originalPrice,
+        discount: 100,
+        currency: 'USD'
+      } : undefined,
+      instructions: item.instructions
+    });
+  }
+  
+  return games;
+}
+
+async function getEpicGamesOfficial(): Promise<Game[] | null> {
   const url = 'https://store-site-backend-static.ak.epicgames.com/freeGamesPromotions?locale=en&country=US&allowCountries=US';
   
   try {
@@ -668,17 +766,17 @@ async function getEpicGames(): Promise<Game[] | null> {
       headers: { 'User-Agent': 'Mozilla/5.0' }
     });
     
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    if (!response.ok) return null;
     
     const data = await response.json();
-    return parseEpicGames(data);
+    return parseEpicGamesOfficial(data);
   } catch (error) {
-    console.error('Error fetching Epic games:', error);
+    console.error('Error fetching Epic official games:', error);
     return null;
   }
 }
 
-function parseEpicGames(data: any): Game[] {
+function parseEpicGamesOfficial(data: any): Game[] {
   const freeGames: Game[] = [];
   
   if (!data?.data?.Catalog?.searchStore?.elements) return freeGames;
@@ -713,7 +811,7 @@ function parseEpicGames(data: any): Game[] {
         description: game.description || 'No description available',
         startDate: offer.startDate,
         endDate: offer.endDate,
-        url: `https://store.epicgames.com/en-US/p/${slug}`,
+        url: `https://store.epicgames.com/p/${slug}`,
         image: imageUrl,
         price: {
           original: originalPrice / 100,
@@ -727,183 +825,33 @@ function parseEpicGames(data: any): Game[] {
   return freeGames;
 }
 
-async function getSteamGames(): Promise<Game[] | null> {
-  // Using SteamDB's free promotions API (unofficial)
-  try {
-    const response = await fetch('https://steamdb.info/api/GetFreebies/', {
-      headers: { 
-        'User-Agent': 'Mozilla/5.0',
-        'Accept': 'application/json'
-      }
-    });
-    
-    if (!response.ok) {
-      // Fallback: Check Steam's own API for common free games
-      return getSteamFallback();
-    }
-    
-    const data = await response.json();
-    return parseSteamGames(data);
-  } catch (error) {
-    console.error('Error fetching Steam games:', error);
-    return getSteamFallback();
-  }
-}
-
-async function getSteamFallback(): Promise<Game[] | null> {
-  // Fallback method: Check specific app IDs that are known to have promotions
-  // This would need to be expanded with a proper Steam API implementation
-  const freeGames: Game[] = [];
+function mergeEpicGames(gamerPowerGames: Game[], officialGames: Game[]): Game[] {
+  const merged: Game[] = [...officialGames];
+  const officialIds = new Set(officialGames.map(g => g.title.toLowerCase()));
   
-  try {
-    // Check Steam's featured items
-    const response = await fetch('https://store.steampowered.com/api/featured/');
-    if (!response.ok) return null;
+  for (const game of gamerPowerGames) {
+    if (!officialIds.has(game.title.toLowerCase())) {
+      merged.push(game);
+    }
+  }
+  
+  for (const official of merged) {
+    const gp = gamerPowerGames.find(g => 
+      g.title.toLowerCase() === official.title.toLowerCase()
+    );
     
-    const data = await response.json();
-    
-    // Look for free games in featured categories
-    if (data.specials?.items) {
-      for (const item of data.specials.items) {
-        if (item.discount_percent === 100) {
-          const details = await getSteamAppDetails(item.id);
-          if (details) {
-            freeGames.push(details);
-          }
-        }
+    if (gp) {
+      if (gp.instructions && !official.instructions) {
+        official.instructions = gp.instructions;
+      }
+      
+      if (gp.price && (!official.price || official.price.original === 0)) {
+        official.price = gp.price;
       }
     }
-  } catch (error) {
-    console.error('Steam fallback error:', error);
   }
   
-  return freeGames.length > 0 ? freeGames : null;
-}
-
-async function getSteamAppDetails(appId: number): Promise<Game | null> {
-  try {
-    const response = await fetch(`https://store.steampowered.com/api/appdetails?appids=${appId}`);
-    if (!response.ok) return null;
-    
-    const data = await response.json();
-    const gameData = data[appId]?.data;
-    
-    if (!gameData) return null;
-    
-    // Only return if it's truly free to keep (not F2P)
-    if (gameData.is_free && gameData.type === 'game') {
-      return {
-        id: appId.toString(),
-        store: 'steam',
-        title: gameData.name,
-        description: gameData.short_description || 'No description available',
-        startDate: new Date().toISOString(),
-        endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // Default 7 days
-        url: `https://store.steampowered.com/app/${appId}`,
-        image: gameData.header_image,
-        price: {
-          original: gameData.price_overview?.initial || 0,
-          discount: 100,
-          currency: gameData.price_overview?.currency || 'USD'
-        },
-        rating: gameData.metacritic?.score ? {
-          score: gameData.metacritic.score,
-          count: 0
-        } : undefined
-      };
-    }
-    
-    return null;
-  } catch (error) {
-    console.error(`Error fetching Steam app ${appId}:`, error);
-    return null;
-  }
-}
-
-function parseSteamGames(data: any): Game[] {
-  const freeGames: Game[] = [];
-  
-  if (!data?.data) return freeGames;
-  
-  for (const item of data.data) {
-    if (item.type === 'game' && item.discount === 100) {
-      freeGames.push({
-        id: item.appid.toString(),
-        store: 'steam',
-        title: item.name,
-        description: item.description || 'No description available',
-        startDate: new Date(item.start * 1000).toISOString(),
-        endDate: new Date(item.end * 1000).toISOString(),
-        url: `https://store.steampowered.com/app/${item.appid}`,
-        image: item.image,
-        price: {
-          original: item.original_price || 0,
-          discount: 100,
-          currency: 'USD'
-        }
-      });
-    }
-  }
-  
-  return freeGames;
-}
-
-async function getGOGGames(): Promise<Game[] | null> {
-  try {
-    const response = await fetch('https://www.gog.com/games/ajax/filtered?mediaType=game&price=free&sort=popularity', {
-      headers: { 'User-Agent': 'Mozilla/5.0' }
-    });
-    
-    if (!response.ok) return null;
-    
-    const data = await response.json();
-    return parseGOGGames(data);
-  } catch (error) {
-    console.error('Error fetching GOG games:', error);
-    return null;
-  }
-}
-
-function parseGOGGames(data: any): Game[] {
-  const freeGames: Game[] = [];
-  
-  if (!data?.products) return freeGames;
-  
-  const now = Date.now();
-  
-  for (const game of data.products) {
-    // Check if it's a promotional free game (not permanently free)
-    if (game.price?.isFree && game.price?.discount > 0) {
-      freeGames.push({
-        id: game.id.toString(),
-        store: 'gog',
-        title: game.title,
-        description: game.description || 'No description available',
-        startDate: new Date(now).toISOString(),
-        endDate: new Date(now + 7 * 24 * 60 * 60 * 1000).toISOString(),
-        url: `https://www.gog.com${game.url}`,
-        image: game.image ? `https:${game.image}_product_card_v2_mobile_slider_639.jpg` : null,
-        price: {
-          original: game.price?.baseAmount || 0,
-          discount: game.price?.discount || 100,
-          currency: 'USD'
-        },
-        rating: game.rating ? {
-          score: Math.round(game.rating * 10),
-          count: game.votesCount || 0
-        } : undefined
-      });
-    }
-  }
-  
-  return freeGames;
-}
-
-async function getUbisoftGames(): Promise<Game[] | null> {
-  // Ubisoft doesn't have a public API for free games
-  // This would require web scraping or manual tracking
-  // For now, returning null - can be implemented with scraping
-  return null;
+  return merged;
 }
 
 function createEmbed(game: Game, t: any, lang: Language): any {
@@ -917,7 +865,7 @@ function createEmbed(game: Game, t: any, lang: Language): any {
     fields: [],
     footer: { 
       text: `${storeNames[game.store]} • ${t.store_footer}`,
-      icon_url: getStoreIcon(game.store)
+      icon_url: getStoreIconUrl(game.store)
     },
     timestamp: new Date().toISOString()
   };
@@ -926,14 +874,12 @@ function createEmbed(game: Game, t: any, lang: Language): any {
     embed.image = { url: game.image };
   }
   
-  // Available until (Discord timestamp)
   embed.fields.push({
     name: t.available_until,
     value: `<t:${endTimestamp}:F> (<t:${endTimestamp}:R>)`,
     inline: false
   });
   
-  // Original price
   if (game.price && game.price.original > 0) {
     const priceFormatted = new Intl.NumberFormat(getLocaleForLanguage(lang), {
       style: 'currency',
@@ -947,53 +893,43 @@ function createEmbed(game: Game, t: any, lang: Language): any {
     });
   }
   
-  // Rating
-  if (game.rating) {
-    const stars = '⭐'.repeat(Math.round(game.rating.score / 20));
-    const ratingText = `${stars} ${game.rating.score}/100`;
-    const countText = game.rating.count > 0 ? ` (${game.rating.count.toLocaleString()} ${lang === 'de' ? 'Bewertungen' : 'reviews'})` : '';
-    
+  if (game.instructions && game.instructions !== 'N/A') {
+    const instructions = game.instructions.substring(0, 200) + (game.instructions.length > 200 ? '...' : '');
     embed.fields.push({
-      name: t.rating,
-      value: ratingText + countText,
-      inline: true
+      name: t.how_to_claim,
+      value: instructions,
+      inline: false
     });
   }
   
-  // Get now links
-  const links = getStoreLinks(game);
   embed.fields.push({
     name: t.get_now,
-    value: links,
+    value: `[${storeNames[game.store]}](${game.url})`,
     inline: false
   });
   
   return embed;
 }
 
-function getStoreIcon(store: StoreType): string {
+function getStoreEmoji(store: StoreType): string {
+  const emojis: Record<StoreType, string> = {
+    epic: '🎮',
+    steam: '🎯',
+    gog: '🐉',
+    itchio: '🎨'
+  };
+  return emojis[store];
+}
+
+
+function getStoreIconUrl(store: StoreType): string {
   const icons: Record<StoreType, string> = {
     epic: 'https://cdn.brandfetch.io/idjxHPThVp/w/800/h/929/theme/dark/logo.png?c=1bxid64Mup7aczewSAYMX&t=1667655482104',
     steam: 'https://images.seeklogo.com/logo-png/27/1/steam-logo-png_seeklogo-270306.png',
     gog: 'https://cdn.brandfetch.io/idKvjVxYV6/w/128/h/128/theme/dark/logo.png?c=1bxid64Mup7aczewSAYMX&t=1761868104778',
-    ubisoft: 'https://cdn.brandfetch.io/idtVsonT9X/w/800/h/831/theme/dark/symbol.png?c=1bxid64Mup7aczewSAYMX&t=1717149829878'
+    itchio: 'https://cdn.brandfetch.io/idHwxBm5XT/w/316/h/316/theme/dark/icon.png?c=1bxid64Mup7aczewSAYMX&t=1765065158087'
   };
   return icons[store];
-}
-
-function getStoreLinks(game: Game): string {
-  switch (game.store) {
-    case 'epic':
-      return `[Website](${game.url}) • [Launcher](https://epicfreegames.net/r/app/${game.id})`;
-    case 'steam':
-      return `[Website](${game.url}) • [Client](steam://store/${game.url.match(/\/app\/(\d+)/)?.[1]})`;
-    case 'gog':
-      return `[Website](${game.url}) • [Galaxy](goggalaxy://openGameView/${game.url.match(/\/game\/([^\/]+)/)?.[1]})`;
-    case 'ubisoft':
-      return `[Website](${game.url})`;
-    default:
-      return `[Website](${game.url})`;
-  }
 }
 
 function getLocaleForLanguage(lang: Language): string {
@@ -1010,7 +946,6 @@ function getLocaleForLanguage(lang: Language): string {
   return locales[lang];
 }
 
-// Guild Config Management
 async function saveGuildConfig(env: Env, guildId: string, channelId: string, threadId?: string): Promise<void> {
   const existing = await getGuildConfig(env, guildId);
   const config: GuildConfig = {
@@ -1019,7 +954,7 @@ async function saveGuildConfig(env: Env, guildId: string, channelId: string, thr
     threadId,
     enabled: true,
     language: existing?.language || 'en',
-    stores: existing?.stores || ['epic', 'steam'],
+    stores: existing?.stores || ['epic', 'steam', 'gog', 'itchio'],
     mentionRoles: existing?.mentionRoles || [],
     separateThreads: existing?.separateThreads || false,
     storeThreads: existing?.storeThreads || {}
@@ -1103,7 +1038,6 @@ async function getAllGuildConfigs(env: Env): Promise<GuildConfig[]> {
   return configs;
 }
 
-// Posted Games Management
 async function loadPostedGames(env: Env): Promise<string[]> {
   try {
     const data = await env.POSTED_GAMES.get('games', 'json');
@@ -1116,8 +1050,7 @@ async function loadPostedGames(env: Env): Promise<string[]> {
 
 async function savePostedGames(env: Env, games: string[]): Promise<void> {
   try {
-    // Keep last 500 games to prevent unlimited growth
-    const gamesToStore = games.slice(-500);
+    const gamesToStore = games.slice(-1000);
     await env.POSTED_GAMES.put('games', JSON.stringify(gamesToStore));
   } catch (error) {
     console.error('Error saving posted games:', error);
