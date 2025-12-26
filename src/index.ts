@@ -290,7 +290,7 @@ const storeColors: Record<StoreType, number> = {
 };
 
 export default {
-  async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
+  async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
     ctx.waitUntil(checkAndPostFreeGames(env));
   },
 
