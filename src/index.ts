@@ -485,6 +485,7 @@ async function checkAndPostFreeGames(env: Env): Promise<void> {
   console.log("🔍 Checking for free games...");
 
   try {
+    console.log("Load Guild configs...");
     const guilds = await getAllGuildConfigs(env);
     console.log("Guild configs loaded:", JSON.stringify(guilds, null, 2));
 
