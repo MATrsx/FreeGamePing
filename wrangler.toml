@@ -7,8 +7,8 @@ enabled = true
 
 # KV Namespace für gespeicherte Spiele
 kv_namespaces = [
-  { binding = "POSTED_GAMES", id = "0b9bb022854d4dfda1e014c7afee79e8", preview_id = "b90d744975f24fe9ac7c1274ac3911ca" },
-  { binding = "GUILD_CONFIGS", id = "3ac68e8a834e4a2fb8742d5bacd7ff5b", preview_id = "14c2165b62d34932b90038e18ce7fefc" }
+  { binding = "POSTED_GAMES", id = "0b9bb022854d4dfda1e014c7afee79e8" },
+  { binding = "GUILD_CONFIGS", id = "3ac68e8a834e4a2fb8742d5bacd7ff5b" }
 ]
 
 # Cron Trigger
