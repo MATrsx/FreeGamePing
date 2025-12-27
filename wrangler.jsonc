@@ -18,7 +18,11 @@
 		{
 			"binding": "GUILD_CONFIGS",
 			"id": "3ac68e8a834e4a2fb8742d5bacd7ff5b"
-		}
+		},
+        {
+            "binding": "COMMAND_COOLDOWNS",
+            "id": "7b144fabe52346b680e7be30687ea1e4"
+        }
 	],
 	"triggers": {
 		"crons": ["0 */6 * * *", "2 15 * * *", "2 16 * * *"]
