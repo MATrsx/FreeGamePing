@@ -113,7 +113,7 @@ async function handleSetupCommand(interaction: any, env: Env, existingConfig: Gu
         inline: false
       }
     ],
-    footer: { text: 'Free Games Bot • Setup Wizard' },
+    footer: { text: 'PixelPost • Setup Wizard' },
     timestamp: new Date().toISOString()
   };
 
@@ -216,7 +216,10 @@ async function handleSetupComponent(
     
     await env.GUILD_CONFIGS.put(`temp_${guildId}`, JSON.stringify(tempConfig));
     
-    // Nächster Schritt: Kanal auswählen
+    // Hole alle verfügbaren Kanäle vom Server
+    const channels = await fetchGuildChannels(env, guildId);
+    
+    // Nächster Schritt: Kanal auswählen mit Dropdown
     const embed = {
       title: '✅ ' + t.language_selected,
       description: t.setup_step_channel,
@@ -228,29 +231,63 @@ async function handleSetupComponent(
           inline: false
         }
       ],
-      footer: { text: 'Free Games Bot • Setup Wizard' },
+      footer: { text: 'PixelPost • Setup Wizard' },
       timestamp: new Date().toISOString()
     };
 
-    const components = [
-      {
-        type: ComponentType.ACTION_ROW,
-        components: [
-          {
-            type: ComponentType.BUTTON,
-            style: ButtonStyle.SUCCESS,
-            label: t.use_current_channel,
-            custom_id: `channel_current_${guildId}_setup`
-          },
-          {
-            type: ComponentType.BUTTON,
-            style: ButtonStyle.SECONDARY,
-            label: t.cancel,
-            custom_id: `cancel_setup_${guildId}_setup`
-          }
-        ]
+    const components = [];
+    
+    // Dropdown für Channel-Auswahl
+    if (channels && channels.length > 0) {
+      const channelOptions = channels
+        .filter(ch => 
+          ch.type === 0 || // Text Channel
+          ch.type === 5 || // Announcement Channel
+          ch.type === 15   // Forum Channel
+        )
+        .slice(0, 25) // Discord limit: max 25 options
+        .map(ch => ({
+          label: getChannelLabel(ch),
+          value: `channel_${ch.id}`,
+          description: getChannelDescription(ch),
+          emoji: getChannelEmoji(ch)
+        }));
+
+      if (channelOptions.length > 0) {
+        components.push({
+          type: ComponentType.ACTION_ROW,
+          components: [
+            {
+              type: ComponentType.SELECT_MENU,
+              custom_id: `select_channel_${guildId}_setup`,
+              placeholder: t.select_channel_placeholder || 'Choose a channel...',
+              min_values: 1,
+              max_values: 1,
+              options: channelOptions
+            }
+          ]
+        });
       }
-    ];
+    }
+    
+    // Buttons für Quick-Actions
+    components.push({
+      type: ComponentType.ACTION_ROW,
+      components: [
+        {
+          type: ComponentType.BUTTON,
+          style: ButtonStyle.SUCCESS,
+          label: t.use_current_channel,
+          custom_id: `channel_current_${guildId}_setup`
+        },
+        {
+          type: ComponentType.BUTTON,
+          style: ButtonStyle.SECONDARY,
+          label: t.cancel,
+          custom_id: `cancel_setup_${guildId}_setup`
+        }
+      ]
+    });
 
     return new Response(JSON.stringify({
       type: InteractionResponseType.UPDATE_MESSAGE,
@@ -261,6 +298,35 @@ async function handleSetupComponent(
     }), {
       headers: { 'Content-Type': 'application/json' }
     });
+  }
+  
+  // Handler für Channel-Auswahl aus Dropdown
+  if (action === 'select' && param === 'channel') {
+    const selectedValue = interaction.data.values?.[0];
+    if (!selectedValue) {
+      return respondWithEmbed({
+        title: '❌ Error',
+        description: 'No channel selected',
+        color: 0xff5555
+      }, true);
+    }
+    
+    // Extrahiere Channel-ID aus dem Value
+    const channelId = selectedValue.replace('channel_', '');
+    
+    const tempConfig = await env.GUILD_CONFIGS.get(`temp_${guildId}`, 'json') as GuildConfig;
+    if (!tempConfig) {
+      return respondWithEmbed({
+        title: '❌ Error',
+        description: 'Setup session expired. Please start again with /setup',
+        color: 0xff5555
+      }, true);
+    }
+    
+    tempConfig.channelId = channelId;
+    await env.GUILD_CONFIGS.put(`temp_${guildId}`, JSON.stringify(tempConfig));
+    
+    return proceedToStoreSelection(tempConfig, env, guildId);
   }
   
   if (action === 'channel') {
@@ -274,79 +340,12 @@ async function handleSetupComponent(
     }
     
     tempConfig.channelId = interaction.channel_id;
-    const t = translations[tempConfig.language];
-    
-    // Nächster Schritt: Stores auswählen
-    const embed = {
-      title: '✅ ' + t.channel_selected,
-      description: t.setup_step_stores,
-      color: 0x00ff99,
-      fields: [
-        {
-          name: '📍 ' + t.step + ' 3',
-          value: t.setup_stores_instructions,
-          inline: false
-        },
-        {
-          name: '📦 ' + t.selected,
-          value: tempConfig.stores.map(s => `${getStoreEmoji(s)} ${storeNames[s]}`).join('\n'),
-          inline: false
-        }
-      ],
-      footer: { text: 'Free Games Bot • Setup Wizard' },
-      timestamp: new Date().toISOString()
-    };
-
-    const storeButtons = [
-      { id: 'epic', name: 'Epic Games', emoji: '🎮' },
-      { id: 'steam', name: 'Steam', emoji: '🎯' },
-      { id: 'gog', name: 'GOG', emoji: '🐉' },
-      { id: 'itchio', name: 'Itch.io', emoji: '🎨' }
-    ];
-
-    const components = [
-      {
-        type: ComponentType.ACTION_ROW,
-        components: storeButtons.map(store => ({
-          type: ComponentType.BUTTON,
-          style: tempConfig.stores.includes(store.id as StoreType) ? ButtonStyle.SUCCESS : ButtonStyle.SECONDARY,
-          label: store.name,
-          emoji: { name: store.emoji },
-          custom_id: `store_${store.id}_${guildId}_setup`
-        }))
-      },
-      {
-        type: ComponentType.ACTION_ROW,
-        components: [
-          {
-            type: ComponentType.BUTTON,
-            style: ButtonStyle.SUCCESS,
-            label: t.finish_setup,
-            custom_id: `finish_setup_${guildId}_setup`
-          },
-          {
-            type: ComponentType.BUTTON,
-            style: ButtonStyle.SECONDARY,
-            label: t.cancel,
-            custom_id: `cancel_setup_${guildId}_setup`
-          }
-        ]
-      }
-    ];
-
     await env.GUILD_CONFIGS.put(`temp_${guildId}`, JSON.stringify(tempConfig));
-
-    return new Response(JSON.stringify({
-      type: InteractionResponseType.UPDATE_MESSAGE,
-      data: {
-        embeds: [embed],
-        components
-      }
-    }), {
-      headers: { 'Content-Type': 'application/json' }
-    });
+    
+    return proceedToStoreSelection(tempConfig, env, guildId);
   }
   
+  // [Rest des Codes bleibt gleich - store, finish, cancel actions...]
   if (action === 'store') {
     const store = param as StoreType;
     const tempConfig = await env.GUILD_CONFIGS.get(`temp_${guildId}`, 'json') as GuildConfig;
@@ -388,7 +387,7 @@ async function handleSetupComponent(
           inline: false
         }
       ],
-      footer: { text: 'Free Games Bot • Setup Wizard' },
+      footer: { text: 'PixelPost • Setup Wizard' },
       timestamp: new Date().toISOString()
     };
 
@@ -478,7 +477,7 @@ async function handleSetupComponent(
           inline: true
         }
       ],
-      footer: { text: 'Free Games Bot' },
+      footer: { text: 'PixelPost' },
       timestamp: new Date().toISOString()
     };
 
@@ -523,7 +522,7 @@ async function handleHelpCommand(interaction: any, hasAdmin: boolean, lang: Lang
     description: t.help_description,
     color: 0x5865F2,
     fields: [],
-    footer: { text: 'Free Games Bot' },
+    footer: { text: 'PixelPost' },
     timestamp: new Date().toISOString()
   };
 
@@ -602,7 +601,7 @@ async function handleStatusCommand(interaction: any, config: GuildConfig | null,
         inline: false
       }
     ],
-    footer: { text: 'Free Games Bot' },
+    footer: { text: 'PixelPost' },
     timestamp: new Date().toISOString()
   };
 
@@ -1238,6 +1237,147 @@ async function savePostedGames(env: Env, games: string[]): Promise<void> {
 }
 
 // ============================================================================
+// HELPER FUNCTIONS FÜR CHANNEL-AUSWAHL
+// ============================================================================
+
+async function fetchGuildChannels(env: Env, guildId: string): Promise<any[]> {
+  try {
+    const response = await fetch(`https://discord.com/api/v10/guilds/${guildId}/channels`, {
+      headers: {
+        'Authorization': `Bot ${env.DISCORD_BOT_TOKEN}`
+      }
+    });
+    
+    if (!response.ok) {
+      console.error('Error fetching guild channels:', await response.text());
+      return [];
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching channels:', error);
+    return [];
+  }
+}
+
+function getChannelLabel(channel: any): string {
+  let label = channel.name;
+  
+  // Füge Parent-Kategorie hinzu wenn vorhanden
+  if (channel.parent_id) {
+    label = `📁 ${label}`;
+  }
+  
+  // Kürze zu lange Namen
+  if (label.length > 100) {
+    label = label.substring(0, 97) + '...';
+  }
+  
+  return label;
+}
+
+function getChannelDescription(channel: any): string {
+  const types: Record<number, string> = {
+    0: 'Text Channel',
+    5: 'Announcement Channel',
+    15: 'Forum Channel'
+  };
+  
+  let desc = types[channel.type] || 'Channel';
+  
+  if (channel.topic && channel.topic.length > 0) {
+    const topic = channel.topic.substring(0, 50);
+    desc += ` • ${topic}${channel.topic.length > 50 ? '...' : ''}`;
+  }
+  
+  return desc;
+}
+
+function getChannelEmoji(channel: any): { name: string } {
+  const emojis: Record<number, string> = {
+    0: '💬',     // Text Channel
+    5: '📢',     // Announcement Channel
+    15: '💭'     // Forum Channel
+  };
+  
+  return { name: emojis[channel.type] || '📝' };
+}
+
+async function proceedToStoreSelection(tempConfig: GuildConfig, env: Env, guildId: string): Promise<Response> {
+  const t = translations[tempConfig.language];
+  
+  // Nächster Schritt: Stores auswählen
+  const embed = {
+    title: '✅ ' + t.channel_selected,
+    description: t.setup_step_stores,
+    color: 0x00ff99,
+    fields: [
+      {
+        name: '📍 ' + t.step + ' 3',
+        value: t.setup_stores_instructions,
+        inline: false
+      },
+      {
+        name: '📦 ' + t.selected,
+        value: tempConfig.stores.map(s => `${getStoreEmoji(s)} ${storeNames[s]}`).join('\n'),
+        inline: false
+      }
+    ],
+    footer: { text: 'PixelPost • Setup Wizard' },
+    timestamp: new Date().toISOString()
+  };
+
+  const storeButtons = [
+    { id: 'epic', name: 'Epic Games', emoji: '🎮' },
+    { id: 'steam', name: 'Steam', emoji: '🎯' },
+    { id: 'gog', name: 'GOG', emoji: '🐉' },
+    { id: 'itchio', name: 'Itch.io', emoji: '🎨' }
+  ];
+
+  const components = [
+    {
+      type: ComponentType.ACTION_ROW,
+      components: storeButtons.map(store => ({
+        type: ComponentType.BUTTON,
+        style: tempConfig.stores.includes(store.id as StoreType) ? ButtonStyle.SUCCESS : ButtonStyle.SECONDARY,
+        label: store.name,
+        emoji: { name: store.emoji },
+        custom_id: `store_${store.id}_${guildId}_setup`
+      }))
+    },
+    {
+      type: ComponentType.ACTION_ROW,
+      components: [
+        {
+          type: ComponentType.BUTTON,
+          style: ButtonStyle.SUCCESS,
+          label: t.finish_setup,
+          custom_id: `finish_setup_${guildId}_setup`
+        },
+        {
+          type: ComponentType.BUTTON,
+          style: ButtonStyle.SECONDARY,
+          label: t.cancel,
+          custom_id: `cancel_setup_${guildId}_setup`
+        }
+      ]
+    }
+  ];
+
+  await env.GUILD_CONFIGS.put(`temp_${guildId}`, JSON.stringify(tempConfig));
+
+  return new Response(JSON.stringify({
+    type: InteractionResponseType.UPDATE_MESSAGE,
+    data: {
+      embeds: [embed],
+      components
+    }
+  }), {
+    headers: { 'Content-Type': 'application/json' }
+  });
+}
+
+// ============================================================================
 // UTILITY FUNCTIONS
 // ============================================================================
 
@@ -1254,7 +1394,7 @@ function getLocaleForLanguage(lang: Language): string {
   };
   return locales[lang];
 }/**
- * Multi-Store Free Games Bot für Cloudflare Workers (TypeScript)
+ * Multi-Store PixelPost für Cloudflare Workers (TypeScript)
  * Vollständig überarbeitete Version mit verbesserter UX
  */
 
@@ -1381,7 +1521,7 @@ export default {
       return new Response('Check completed', { status: 200 });
     }
     
-    return new Response('🎮 Free Games Bot is running!', { status: 200 });
+    return new Response('🎮 PixelPost is running!', { status: 200 });
   }
 };
 
@@ -1438,10 +1578,11 @@ const translations: Record<Language, Record<string, string>> = {
   en: {
     // Setup Wizard
     setup_wizard_title: 'Setup Wizard',
-    setup_wizard_desc: 'Welcome to the Free Games Bot! Let\'s set everything up in just a few steps.',
+    setup_wizard_desc: 'Welcome to the PixelPost! Let\'s set everything up in just a few steps.',
     setup_step_language: 'Please select your preferred language:',
     setup_step_channel: 'Select Channel',
-    setup_channel_instructions: 'Where should I post free games? Click the button below to use this channel.',
+    select_channel_placeholder: 'Choose a channel...',
+    setup_channel_instructions: 'Where should I post free games? Select a channel from the dropdown below or use the current channel.',
     use_current_channel: 'Use This Channel',
     setup_step_stores: 'Select Game Stores',
     setup_stores_instructions: 'Which stores should I monitor? Click stores to toggle them, then click "Finish Setup".',
@@ -1469,7 +1610,7 @@ const translations: Record<Language, Record<string, string>> = {
     
     // Help Command
     help_title: 'Help & Commands',
-    help_description: 'Here are all available commands for the Free Games Bot:',
+    help_description: 'Here are all available commands for the PixelPost:',
     help_user_commands: 'User Commands',
     help_admin_commands: 'Admin Commands',
     help_cmd_help: 'Show this help message',
@@ -1510,10 +1651,11 @@ const translations: Record<Language, Record<string, string>> = {
   de: {
     // Setup Wizard
     setup_wizard_title: 'Einrichtungsassistent',
-    setup_wizard_desc: 'Willkommen beim Free Games Bot! Lass uns alles in wenigen Schritten einrichten.',
+    setup_wizard_desc: 'Willkommen beim PixelPost! Lass uns alles in wenigen Schritten einrichten.',
     setup_step_language: 'Bitte wähle deine bevorzugte Sprache:',
     setup_step_channel: 'Kanal auswählen',
-    setup_channel_instructions: 'Wo soll ich kostenlose Spiele posten? Klicke auf den Button um diesen Kanal zu nutzen.',
+    select_channel_placeholder: 'Wähle einen Kanal...',
+    setup_channel_instructions: 'Wo soll ich kostenlose Spiele posten? Wähle einen Kanal aus dem Dropdown-Menü oder nutze den aktuellen Kanal.',
     use_current_channel: 'Diesen Kanal nutzen',
     setup_step_stores: 'Game Stores auswählen',
     setup_stores_instructions: 'Welche Stores soll ich überwachen? Klicke auf Stores um sie zu aktivieren/deaktivieren, dann auf "Einrichtung abschließen".',
@@ -1541,7 +1683,7 @@ const translations: Record<Language, Record<string, string>> = {
     
     // Help Command
     help_title: 'Hilfe & Befehle',
-    help_description: 'Hier sind alle verfügbaren Befehle für den Free Games Bot:',
+    help_description: 'Hier sind alle verfügbaren Befehle für den PixelPost:',
     help_user_commands: 'Nutzer-Befehle',
     help_admin_commands: 'Admin-Befehle',
     help_cmd_help: 'Diese Hilfenachricht anzeigen',
@@ -1581,10 +1723,11 @@ const translations: Record<Language, Record<string, string>> = {
   
   fr: {
     setup_wizard_title: 'Assistant de configuration',
-    setup_wizard_desc: 'Bienvenue sur Free Games Bot! Configurons tout en quelques étapes.',
+    setup_wizard_desc: 'Bienvenue sur PixelPost! Configurons tout en quelques étapes.',
     setup_step_language: 'Veuillez sélectionner votre langue préférée:',
     setup_step_channel: 'Sélectionner le canal',
-    setup_channel_instructions: 'Où dois-je publier les jeux gratuits? Cliquez sur le bouton ci-dessous pour utiliser ce canal.',
+    select_channel_placeholder: 'Choisir un canal...',
+    setup_channel_instructions: 'Où dois-je publier les jeux gratuits? Sélectionnez un canal dans le menu déroulant ou utilisez le canal actuel.',
     use_current_channel: 'Utiliser ce canal',
     setup_step_stores: 'Sélectionner les magasins de jeux',
     setup_stores_instructions: 'Quels magasins dois-je surveiller? Cliquez sur les magasins pour les activer/désactiver, puis sur "Terminer la configuration".',
@@ -1608,7 +1751,7 @@ const translations: Record<Language, Record<string, string>> = {
     none: 'Aucun',
     selected: 'Sélectionné',
     help_title: 'Aide et commandes',
-    help_description: 'Voici toutes les commandes disponibles pour Free Games Bot:',
+    help_description: 'Voici toutes les commandes disponibles pour PixelPost:',
     help_user_commands: 'Commandes utilisateur',
     help_admin_commands: 'Commandes admin',
     help_cmd_help: 'Afficher ce message d\'aide',
@@ -1640,10 +1783,11 @@ const translations: Record<Language, Record<string, string>> = {
   
   es: {
     setup_wizard_title: 'Asistente de configuración',
-    setup_wizard_desc: '¡Bienvenido a Free Games Bot! Configuremos todo en pocos pasos.',
+    setup_wizard_desc: '¡Bienvenido a PixelPost! Configuremos todo en pocos pasos.',
     setup_step_language: 'Por favor, selecciona tu idioma preferido:',
     setup_step_channel: 'Seleccionar canal',
-    setup_channel_instructions: '¿Dónde debo publicar juegos gratis? Haz clic en el botón a continuación para usar este canal.',
+    select_channel_placeholder: 'Elegir un canal...',
+    setup_channel_instructions: '¿Dónde debo publicar juegos gratis? Selecciona un canal del menú desplegable o usa el canal actual.',
     use_current_channel: 'Usar este canal',
     setup_step_stores: 'Seleccionar tiendas de juegos',
     setup_stores_instructions: '¿Qué tiendas debo monitorear? Haz clic en las tiendas para activarlas/desactivarlas, luego en "Finalizar configuración".',
@@ -1667,7 +1811,7 @@ const translations: Record<Language, Record<string, string>> = {
     none: 'Ninguno',
     selected: 'Seleccionado',
     help_title: 'Ayuda y comandos',
-    help_description: 'Aquí están todos los comandos disponibles para Free Games Bot:',
+    help_description: 'Aquí están todos los comandos disponibles para PixelPost:',
     help_user_commands: 'Comandos de usuario',
     help_admin_commands: 'Comandos de admin',
     help_cmd_help: 'Mostrar este mensaje de ayuda',
@@ -1699,10 +1843,11 @@ const translations: Record<Language, Record<string, string>> = {
   
   it: {
     setup_wizard_title: 'Assistente di configurazione',
-    setup_wizard_desc: 'Benvenuto in Free Games Bot! Configuriamo tutto in pochi passaggi.',
+    setup_wizard_desc: 'Benvenuto in PixelPost! Configuriamo tutto in pochi passaggi.',
     setup_step_language: 'Seleziona la tua lingua preferita:',
     setup_step_channel: 'Seleziona canale',
-    setup_channel_instructions: 'Dove devo pubblicare i giochi gratis? Clicca sul pulsante qui sotto per usare questo canale.',
+    select_channel_placeholder: 'Scegli un canale...',
+    setup_channel_instructions: 'Dove devo pubblicare i giochi gratis? Seleziona un canale dal menu a tendina o usa il canale attuale.',
     use_current_channel: 'Usa questo canale',
     setup_step_stores: 'Seleziona negozi di giochi',
     setup_stores_instructions: 'Quali negozi devo monitorare? Clicca sui negozi per attivarli/disattivarli, poi su "Completa configurazione".',
@@ -1726,7 +1871,7 @@ const translations: Record<Language, Record<string, string>> = {
     none: 'Nessuno',
     selected: 'Selezionato',
     help_title: 'Aiuto e comandi',
-    help_description: 'Ecco tutti i comandi disponibili per Free Games Bot:',
+    help_description: 'Ecco tutti i comandi disponibili per PixelPost:',
     help_user_commands: 'Comandi utente',
     help_admin_commands: 'Comandi admin',
     help_cmd_help: 'Mostra questo messaggio di aiuto',
@@ -1758,10 +1903,11 @@ const translations: Record<Language, Record<string, string>> = {
   
   pt: {
     setup_wizard_title: 'Assistente de configuração',
-    setup_wizard_desc: 'Bem-vindo ao Free Games Bot! Vamos configurar tudo em poucos passos.',
+    setup_wizard_desc: 'Bem-vindo ao PixelPost! Vamos configurar tudo em poucos passos.',
     setup_step_language: 'Por favor, selecione seu idioma preferido:',
     setup_step_channel: 'Selecionar canal',
-    setup_channel_instructions: 'Onde devo postar jogos grátis? Clique no botão abaixo para usar este canal.',
+    select_channel_placeholder: 'Escolher um canal...',
+    setup_channel_instructions: 'Onde devo postar jogos grátis? Selecione um canal no menu suspenso ou use o canal atual.',
     use_current_channel: 'Usar este canal',
     setup_step_stores: 'Selecionar lojas de jogos',
     setup_stores_instructions: 'Quais lojas devo monitorar? Clique nas lojas para ativá-las/desativá-las, depois em "Concluir configuração".',
@@ -1785,7 +1931,7 @@ const translations: Record<Language, Record<string, string>> = {
     none: 'Nenhum',
     selected: 'Selecionado',
     help_title: 'Ajuda e comandos',
-    help_description: 'Aqui estão todos os comandos disponíveis para o Free Games Bot:',
+    help_description: 'Aqui estão todos os comandos disponíveis para o PixelPost:',
     help_user_commands: 'Comandos de usuário',
     help_admin_commands: 'Comandos admin',
     help_cmd_help: 'Mostrar esta mensagem de ajuda',
@@ -1817,10 +1963,11 @@ const translations: Record<Language, Record<string, string>> = {
   
   ru: {
     setup_wizard_title: 'Мастер настройки',
-    setup_wizard_desc: 'Добро пожаловать в Free Games Bot! Давайте все настроим за несколько шагов.',
+    setup_wizard_desc: 'Добро пожаловать в PixelPost! Давайте все настроим за несколько шагов.',
     setup_step_language: 'Пожалуйста, выберите предпочитаемый язык:',
     setup_step_channel: 'Выбрать канал',
-    setup_channel_instructions: 'Где я должен публиковать бесплатные игры? Нажмите кнопку ниже, чтобы использовать этот канал.',
+    select_channel_placeholder: 'Выбрать канал...',
+    setup_channel_instructions: 'Где мне публиковать бесплатные игры? Выберите канал из выпадающего меню или используйте текущий канал.',
     use_current_channel: 'Использовать этот канал',
     setup_step_stores: 'Выбрать игровые магазины',
     setup_stores_instructions: 'Какие магазины мне отслеживать? Нажмите на магазины, чтобы активировать/деактивировать их, затем на "Завершить настройку".',
@@ -1844,7 +1991,7 @@ const translations: Record<Language, Record<string, string>> = {
     none: 'Нет',
     selected: 'Выбрано',
     help_title: 'Помощь и команды',
-    help_description: 'Вот все доступные команды для Free Games Bot:',
+    help_description: 'Вот все доступные команды для PixelPost:',
     help_user_commands: 'Команды пользователя',
     help_admin_commands: 'Команды админа',
     help_cmd_help: 'Показать это сообщение помощи',
@@ -1876,10 +2023,11 @@ const translations: Record<Language, Record<string, string>> = {
   
   pl: {
     setup_wizard_title: 'Kreator konfiguracji',
-    setup_wizard_desc: 'Witaj w Free Games Bot! Skonfigurujmy wszystko w kilku krokach.',
+    setup_wizard_desc: 'Witaj w PixelPost! Skonfigurujmy wszystko w kilku krokach.',
     setup_step_language: 'Wybierz preferowany język:',
     setup_step_channel: 'Wybierz kanał',
-    setup_channel_instructions: 'Gdzie mam publikować darmowe gry? Kliknij przycisk poniżej, aby użyć tego kanału.',
+    select_channel_placeholder: 'Wybierz kanał...',
+    setup_channel_instructions: 'Gdzie mam publikować darmowe gry? Wybierz kanał z menu rozwijanego lub użyj bieżącego kanału.',
     use_current_channel: 'Użyj tego kanału',
     setup_step_stores: 'Wybierz sklepy z grami',
     setup_stores_instructions: 'Które sklepy mam monitorować? Kliknij sklepy, aby je aktywować/dezaktywować, następnie "Zakończ konfigurację".',
@@ -1903,7 +2051,7 @@ const translations: Record<Language, Record<string, string>> = {
     none: 'Brak',
     selected: 'Wybrano',
     help_title: 'Pomoc i komendy',
-    help_description: 'Oto wszystkie dostępne komendy dla Free Games Bot:',
+    help_description: 'Oto wszystkie dostępne komendy dla PixelPost:',
     help_user_commands: 'Komendy użytkownika',
     help_admin_commands: 'Komendy admina',
     help_cmd_help: 'Pokaż tę wiadomość pomocy',
