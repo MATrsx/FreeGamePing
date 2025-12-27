@@ -1927,27 +1927,6 @@ function mergeEpicGames(gamerPowerGames: Game[], officialGames: Game[]): Game[] 
     processedTitles.add(titleKey);
   }
   
-  // Add GamerPower games that weren't in official API
-  for (const game of gamerPowerGames) {
-    const titleKey = game.title.toLowerCase().trim();
-    
-    // Check if already processed
-    let alreadyExists = false;
-    for (const processedTitle of processedTitles) {
-      if (titleKey === processedTitle || 
-          titleKey.includes(processedTitle) || 
-          processedTitle.includes(titleKey)) {
-        alreadyExists = true;
-        break;
-      }
-    }
-    
-    if (!alreadyExists) {
-      merged.push(game);
-      processedTitles.add(titleKey);
-    }
-  }
-  
   return merged;
 }
 
@@ -2625,7 +2604,7 @@ const translations: Record<Language, Record<string, string>> = {
     // Other
     unknown_command: '❌ Unknown command',
     error_occurred: 'An error occurred',
-    
+
     // Settings Main
     settings_title: 'Bot Settings',
     settings_description: 'Configure all bot settings from here. Click a button below to customize a specific setting.',
