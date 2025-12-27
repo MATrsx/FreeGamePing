@@ -900,14 +900,82 @@ function createGameEmbed(game: Game, t: any, lang: Language): any {
   return embed;
 }
 
+/**
+ * Sendet eine Nachricht an einen Channel oder erstellt einen Forum-Post
+ * @param env - Cloudflare Worker Environment
+ * @param channelId - ID des Ziel-Channels
+ * @param embed - Discord Embed Objekt
+ * @param mentions - Optional: Rollen-Mentions
+ * @returns Promise<boolean> - true bei Erfolg
+ */
 async function sendToChannel(env: Env, channelId: string, embed: any, mentions?: string): Promise<boolean> {
   try {
-    const payload: any = { embeds: [embed] };
+    // Prüfe ob es ein Forum-Channel ist
+    const channelInfo = await getChannelInfo(env, channelId);
+    
+    if (channelInfo && channelInfo.type === 15) {
+      // Forum Channel - erstelle neuen Thread/Post
+      return await createForumPost(env, channelId, embed, mentions);
+    } else {
+      // Normaler Channel - sende normale Nachricht
+      const payload: any = { embeds: [embed] };
+      if (mentions) {
+        payload.content = mentions;
+      }
+      
+      const response = await fetch(`https://discord.com/api/v10/channels/${channelId}/messages`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bot ${env.DISCORD_BOT_TOKEN}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+      
+      if (!response.ok) {
+        console.error(`Error sending to channel ${channelId}:`, await response.text());
+        return false;
+      }
+      
+      return true;
+    }
+  } catch (error) {
+    console.error('Error sending message:', error);
+    return false;
+  }
+}
+
+/**
+ * Erstellt einen neuen Post in einem Forum-Channel
+ * @param env - Cloudflare Worker Environment
+ * @param forumChannelId - ID des Forum-Channels
+ * @param embed - Discord Embed Objekt
+ * @param mentions - Optional: Rollen-Mentions
+ * @returns Promise<boolean> - true bei Erfolg
+ */
+async function createForumPost(env: Env, forumChannelId: string, embed: any, mentions?: string): Promise<boolean> {
+  try {
+    // Extrahiere Spiel-Titel aus dem Embed für den Thread-Namen
+    const gameTitle = embed.title.replace('🎁 ', '').split(' - ')[0];
+    
+    // Kürze Titel falls zu lang (max 100 Zeichen für Thread-Namen)
+    const threadName = gameTitle.length > 100 
+      ? gameTitle.substring(0, 97) + '...'
+      : gameTitle;
+    
+    const payload: any = {
+      name: threadName,
+      message: {
+        embeds: [embed]
+      },
+      auto_archive_duration: 1440 // 24 Stunden
+    };
+    
     if (mentions) {
-      payload.content = mentions;
+      payload.message.content = mentions;
     }
     
-    const response = await fetch(`https://discord.com/api/v10/channels/${channelId}/messages`, {
+    const response = await fetch(`https://discord.com/api/v10/channels/${forumChannelId}/threads`, {
       method: 'POST',
       headers: {
         'Authorization': `Bot ${env.DISCORD_BOT_TOKEN}`,
@@ -917,13 +985,17 @@ async function sendToChannel(env: Env, channelId: string, embed: any, mentions?:
     });
     
     if (!response.ok) {
-      console.error(`Error sending to channel ${channelId}:`, await response.text());
+      const errorText = await response.text();
+      console.error(`Error creating forum post in ${forumChannelId}:`, errorText);
       return false;
     }
     
+    const thread = await response.json();
+    console.log(`✅ Created forum post: ${threadName} (ID: ${thread.id})`);
+    
     return true;
   } catch (error) {
-    console.error('Error sending message:', error);
+    console.error('Error creating forum post:', error);
     return false;
   }
 }
@@ -1240,6 +1312,12 @@ async function savePostedGames(env: Env, games: string[]): Promise<void> {
 // HELPER FUNCTIONS FÜR CHANNEL-AUSWAHL
 // ============================================================================
 
+/**
+ * Ruft alle Channels eines Servers ab
+ * @param env - Cloudflare Worker Environment
+ * @param guildId - ID des Servers
+ * @returns Promise<any[]> - Array von Channel-Objekten
+ */
 async function fetchGuildChannels(env: Env, guildId: string): Promise<any[]> {
   try {
     const response = await fetch(`https://discord.com/api/v10/guilds/${guildId}/channels`, {
@@ -1260,6 +1338,37 @@ async function fetchGuildChannels(env: Env, guildId: string): Promise<any[]> {
   }
 }
 
+/**
+ * Ruft Informationen über einen Channel ab
+ * @param env - Cloudflare Worker Environment
+ * @param channelId - ID des Channels
+ * @returns Promise<any> - Channel-Objekt oder null
+ */
+async function getChannelInfo(env: Env, channelId: string): Promise<any> {
+  try {
+    const response = await fetch(`https://discord.com/api/v10/channels/${channelId}`, {
+      headers: {
+        'Authorization': `Bot ${env.DISCORD_BOT_TOKEN}`
+      }
+    });
+    
+    if (!response.ok) {
+      console.error('Error fetching channel info:', await response.text());
+      return null;
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Error getting channel info:', error);
+    return null;
+  }
+}
+
+/**
+ * Formatiert den Channel-Namen für die Anzeige im Dropdown
+ * @param channel - Discord Channel Objekt
+ * @returns string - Formatierter Label
+ */
 function getChannelLabel(channel: any): string {
   let label = channel.name;
   
@@ -1276,6 +1385,11 @@ function getChannelLabel(channel: any): string {
   return label;
 }
 
+/**
+ * Erstellt eine Beschreibung für den Channel im Dropdown
+ * @param channel - Discord Channel Objekt
+ * @returns string - Beschreibungstext
+ */
 function getChannelDescription(channel: any): string {
   const types: Record<number, string> = {
     0: 'Text Channel',
@@ -1293,6 +1407,11 @@ function getChannelDescription(channel: any): string {
   return desc;
 }
 
+/**
+ * Gibt das passende Emoji für einen Channel-Typ zurück
+ * @param channel - Discord Channel Objekt
+ * @returns object - Emoji-Objekt für Discord
+ */
 function getChannelEmoji(channel: any): { name: string } {
   const emojis: Record<number, string> = {
     0: '💬',     // Text Channel
