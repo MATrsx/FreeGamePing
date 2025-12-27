@@ -909,9 +909,6 @@ async function handleSettingsComponent(
   }
 }
 
-// Die restlichen Settings-Handler folgen im nächsten Teil...
-// Weiter gehts mit Teil 2
-
 async function handleGeneralSettings(
   interaction: any,
   config: GuildConfig,
@@ -2205,7 +2202,7 @@ function formatCooldownTime(ms: number): string {
 }
 
 // ============================================================================
-// GAME CHECKING & POSTING (Teil 2)
+// GAME CHECKING & POSTING
 // ============================================================================
 
 async function checkAndPostFreeGames(env: Env): Promise<void> {
@@ -2778,13 +2775,18 @@ export default {
 // ============================================================================
 
 const translations: Record<Language, Record<string, string>> = {
+
+  // ============================================================================
+  // ENGLISH
+  // ============================================================================
   en: {
+    // --- Setup Wizard ---
     setup_wizard_title: 'Setup Wizard',
-    setup_wizard_desc: 'Welcome to the PixelPost! Let\'s set everything up in just a few steps.',
+    setup_wizard_desc: 'Welcome to PixelPost! Let\'s set everything up in a few steps.',
     setup_step_language: 'Please select your preferred language:',
     setup_step_channel: 'Select Channel',
     select_channel_placeholder: 'Choose a channel...',
-    setup_channel_instructions: 'Where should I post free games? Select a channel from the dropdown below or use the current channel.',
+    setup_channel_instructions: 'Where should I post free games? Select a channel below or use the current channel.',
     use_current_channel: 'Use This Channel',
     setup_step_stores: 'Select Game Stores',
     setup_stores_instructions: 'Which stores should I monitor? Click stores to toggle them, then click "Finish Setup".',
@@ -2794,8 +2796,10 @@ const translations: Record<Language, Record<string, string>> = {
     channel_selected: 'Channel Selected',
     store_toggled: 'Store Updated',
     setup_complete_title: 'Setup Complete!',
-    setup_complete_desc: 'The bot is now configured and will start posting free games automatically.',
+    setup_complete_desc: 'The bot is now configured and will automatically post free games.',
     step: 'Step',
+
+    // --- Status ---
     status_title: 'Bot Status',
     status_active: '✅ Bot is active and posting in',
     status_inactive: '❌ Bot is not configured',
@@ -2807,8 +2811,10 @@ const translations: Record<Language, Record<string, string>> = {
     setup_required: 'Please run `/setup` first to configure the bot.',
     none: 'None',
     selected: 'Selected',
+
+    // --- Help ---
     help_title: 'Help & Commands',
-    help_description: 'Here are all available commands for the PixelPost:',
+    help_description: 'Here are all available commands for PixelPost:',
     help_user_commands: 'User Commands',
     help_admin_commands: 'Admin Commands',
     help_cmd_help: 'Show this help message',
@@ -2818,21 +2824,25 @@ const translations: Record<Language, Record<string, string>> = {
     help_cmd_settings: 'Configure all bot settings (language, stores, roles, etc.)',
     help_links: 'Links & Support',
     help_links_text: '[Documentation](https://github.com/yourrepo) • [Support](https://discord.gg/support)',
-    no_permission_title: 'No Permission',
-    no_permission_desc: 'You need Administrator permissions to use this command.',
+
+    // --- Game Posts ---
     free_title: 'FREE!',
     available_until: '⏰ Available until',
     get_now: '🔗 Get now',
     original_price: '💰 Original price',
     store_footer: 'Free to keep',
     how_to_claim: '📋 How to claim',
+
+    // --- Check Command ---
     check_running_title: 'Checking for Games',
     check_running: 'Searching for new free games... This may take up to 30 seconds.',
     check_complete: '✅ Check complete! New games have been posted if available.',
-    unknown_command: '❌ Unknown command',
-    error_occurred: 'An error occurred',
+    check_cooldown_title: 'Command on Cooldown',
+    check_cooldown_desc: 'This command can only be used once per hour. Try again in: ',
+
+    // --- Settings ---
     settings_title: 'Bot Settings',
-    settings_description: 'Configure all bot settings from here. Click a button below to customize a specific setting.',
+    settings_description: 'Configure all bot settings here. Click a button below to customize a setting.',
     settings_currency: 'Currency',
     settings_notification_roles: 'Notification Roles',
     settings_reactions: 'Reaction Voting',
@@ -2845,14 +2855,18 @@ const translations: Record<Language, Record<string, string>> = {
     settings_btn_roles: 'Roles',
     settings_btn_channel: 'Channel',
     settings_btn_reactions: 'Reactions',
+
     settings_general_title: 'General Settings',
     settings_general_desc: 'Configure currency display and content preferences.',
     settings_toggle_dlcs: 'Toggle DLC Posts',
+
     settings_stores_title: 'Store Configuration',
-    settings_stores_desc: 'Select which game stores to monitor for free games.',
+    settings_stores_desc: 'Select which stores to monitor for free games.',
+
     settings_language_title: 'Language Settings',
     settings_language_desc: 'Choose your preferred language for bot messages.',
     current_language: 'Current Language',
+
     settings_roles_title: 'Notification Roles',
     settings_roles_desc: 'Configure which roles to mention when posting free games.',
     settings_general_role: 'General Notification Role',
@@ -2860,41 +2874,55 @@ const translations: Record<Language, Record<string, string>> = {
     settings_add_general_role: 'Add General Role',
     settings_clear_general_roles: 'Clear All Roles',
     settings_configure_store_roles: 'Configure Store Roles',
+
     settings_channel_title: 'Channel Configuration',
     settings_channel_desc: 'Select where the bot should post free game announcements.',
     current_channel: 'Current Channel',
+
     settings_reactions_title: 'Reaction Voting',
     settings_reactions_desc: 'Enable or disable reaction voting on game posts.',
-    settings_reactions_info: 'When enabled, the bot will add 🔥 (hot deal) and ❄️ (not interested) reactions to each post, allowing users to vote.',
+    settings_reactions_info: 'When enabled, the bot adds 🔥 (hot deal) and ❄️ (not interested) reactions to each post, allowing users to vote.',
     current_status: 'Current Status',
+
+    // --- Errors ---
+    no_permission_title: 'No Permission',
+    no_permission_desc: 'You need Administrator permissions to use this command.',
+    unknown_command: '❌ Unknown command',
+    error_occurred: 'An error occurred',
+
+    // --- Common UI ---
     back: 'Back',
     enabled: 'Enabled',
     disabled: 'Disabled',
     enable: 'Enable',
     disable: 'Disable',
     info: 'Information',
-    check_cooldown_title: 'Command on Cooldown',
-    check_cooldown_desc: 'This command can only be used once per hour. Please try again in: ',
   },
-  
+
+  // ============================================================================
+  // GERMAN
+  // ============================================================================
   de: {
+    // --- Setup Wizard ---
     setup_wizard_title: 'Einrichtungsassistent',
-    setup_wizard_desc: 'Willkommen beim PixelPost! Lass uns alles in wenigen Schritten einrichten.',
+    setup_wizard_desc: 'Willkommen bei PixelPost! Lass uns alles in wenigen Schritten einrichten.',
     setup_step_language: 'Bitte wähle deine bevorzugte Sprache:',
     setup_step_channel: 'Kanal auswählen',
     select_channel_placeholder: 'Wähle einen Kanal...',
-    setup_channel_instructions: 'Wo soll ich kostenlose Spiele posten? Wähle einen Kanal aus dem Dropdown-Menü oder nutze den aktuellen Kanal.',
+    setup_channel_instructions: 'Wo soll ich kostenlose Spiele posten? Wähle einen Kanal oder nutze den aktuellen.',
     use_current_channel: 'Diesen Kanal nutzen',
     setup_step_stores: 'Game Stores auswählen',
-    setup_stores_instructions: 'Welche Stores soll ich überwachen? Klicke auf Stores um sie zu aktivieren/deaktivieren, dann auf "Einrichtung abschließen".',
+    setup_stores_instructions: 'Welche Stores soll ich überwachen? Klicke zum Aktivieren/Deaktivieren, dann "Einrichtung abschließen".',
     finish_setup: 'Einrichtung abschließen',
     cancel: 'Abbrechen',
     language_selected: 'Sprache ausgewählt',
     channel_selected: 'Kanal ausgewählt',
     store_toggled: 'Store aktualisiert',
     setup_complete_title: 'Einrichtung abgeschlossen!',
-    setup_complete_desc: 'Der Bot ist jetzt konfiguriert und wird automatisch kostenlose Spiele posten.',
+    setup_complete_desc: 'Der Bot ist jetzt konfiguriert und postet automatisch kostenlose Spiele.',
     step: 'Schritt',
+
+    // --- Status ---
     status_title: 'Bot-Status',
     status_active: '✅ Bot ist aktiv und postet in',
     status_inactive: '❌ Bot ist nicht konfiguriert',
@@ -2903,35 +2931,41 @@ const translations: Record<Language, Record<string, string>> = {
     status_language: 'Sprache',
     status_roles: 'Erwähnte Rollen',
     store_threads: 'Store-Threads',
-    setup_required: 'Bitte führe zuerst `/setup` aus, um den Bot zu konfigurieren.',
+    setup_required: 'Bitte führe zuerst `/setup` aus.',
     none: 'Keine',
     selected: 'Ausgewählt',
+
+    // --- Help ---
     help_title: 'Hilfe & Befehle',
-    help_description: 'Hier sind alle verfügbaren Befehle für den PixelPost:',
+    help_description: 'Hier sind alle verfügbaren Befehle für PixelPost:',
     help_user_commands: 'Nutzer-Befehle',
     help_admin_commands: 'Admin-Befehle',
     help_cmd_help: 'Diese Hilfenachricht anzeigen',
     help_cmd_status: 'Bot-Konfiguration und Status prüfen',
     help_cmd_setup: 'Interaktiven Einrichtungsassistenten starten',
     help_cmd_check: 'Manuell nach neuen kostenlosen Spielen suchen',
-    help_cmd_settings: 'Alle Bot-Einstellungen konfigurieren (Sprache, Stores, Rollen, etc.)',
+    help_cmd_settings: 'Alle Bot-Einstellungen konfigurieren',
     help_links: 'Links & Support',
     help_links_text: '[Dokumentation](https://github.com/yourrepo) • [Support](https://discord.gg/support)',
-    no_permission_title: 'Keine Berechtigung',
-    no_permission_desc: 'Du benötigst Administrator-Rechte, um diesen Befehl zu nutzen.',
+
+    // --- Game Posts ---
     free_title: 'KOSTENLOS!',
     available_until: '⏰ Verfügbar bis',
     get_now: '🔗 Jetzt holen',
     original_price: '💰 Originalpreis',
     store_footer: 'Kostenlos erhältlich',
     how_to_claim: '📋 So erhältst du es',
+
+    // --- Check Command ---
     check_running_title: 'Prüfe auf Spiele',
-    check_running: 'Suche nach neuen kostenlosen Spielen... Dies kann bis zu 30 Sekunden dauern.',
-    check_complete: '✅ Prüfung abgeschlossen! Neue Spiele wurden gepostet, falls verfügbar.',
-    unknown_command: '❌ Unbekannter Befehl',
-    error_occurred: 'Ein Fehler ist aufgetreten',
+    check_running: 'Suche nach neuen kostenlosen Spielen...',
+    check_complete: '✅ Prüfung abgeschlossen!',
+    check_cooldown_title: 'Befehl im Cooldown',
+    check_cooldown_desc: 'Dieser Befehl kann nur einmal pro Stunde genutzt werden. Versuche es erneut in: ',
+
+    // --- Settings ---
     settings_title: 'Bot-Einstellungen',
-    settings_description: 'Konfiguriere alle Bot-Einstellungen von hier aus. Klicke auf eine Schaltfläche unten, um eine bestimmte Einstellung anzupassen.',
+    settings_description: 'Konfiguriere alle Bot-Einstellungen hier.',
     settings_currency: 'Währung',
     settings_notification_roles: 'Benachrichtigungsrollen',
     settings_reactions: 'Reaktions-Abstimmung',
@@ -2944,90 +2978,785 @@ const translations: Record<Language, Record<string, string>> = {
     settings_btn_roles: 'Rollen',
     settings_btn_channel: 'Kanal',
     settings_btn_reactions: 'Reaktionen',
+
     settings_general_title: 'Allgemeine Einstellungen',
     settings_general_desc: 'Konfiguriere Währungsanzeige und Inhaltseinstellungen.',
     settings_toggle_dlcs: 'DLC-Beiträge umschalten',
+
     settings_stores_title: 'Store-Konfiguration',
-    settings_stores_desc: 'Wähle aus, welche Game-Stores auf kostenlose Spiele überwacht werden sollen.',
+    settings_stores_desc: 'Wähle aus, welche Stores überwacht werden sollen.',
+
     settings_language_title: 'Spracheinstellungen',
-    settings_language_desc: 'Wähle deine bevorzugte Sprache für Bot-Nachrichten.',
+    settings_language_desc: 'Wähle deine bevorzugte Sprache.',
     current_language: 'Aktuelle Sprache',
+
     settings_roles_title: 'Benachrichtigungsrollen',
-    settings_roles_desc: 'Konfiguriere, welche Rollen beim Posten kostenloser Spiele erwähnt werden sollen.',
+    settings_roles_desc: 'Konfiguriere Rollen für Erwähnungen.',
     settings_general_role: 'Allgemeine Benachrichtigungsrolle',
     settings_store_roles: 'Store-spezifische Rollen',
     settings_add_general_role: 'Allgemeine Rolle hinzufügen',
     settings_clear_general_roles: 'Alle Rollen löschen',
     settings_configure_store_roles: 'Store-Rollen konfigurieren',
+
     settings_channel_title: 'Kanal-Konfiguration',
-    settings_channel_desc: 'Wähle aus, wo der Bot kostenlose Spiele ankündigen soll.',
+    settings_channel_desc: 'Wähle den Kanal für Spiele-Posts.',
     current_channel: 'Aktueller Kanal',
+
     settings_reactions_title: 'Reaktions-Abstimmung',
-    settings_reactions_desc: 'Aktiviere oder deaktiviere Reaktions-Abstimmungen bei Spiele-Posts.',
+    settings_reactions_desc: 'Aktiviere oder deaktiviere Reaktions-Abstimmungen.',
     settings_reactions_info: 'Wenn aktiviert, fügt der Bot 🔥 (heißes Angebot) und ❄️ (nicht interessiert) Reaktionen zu jedem Beitrag hinzu, damit Nutzer abstimmen können.',
     current_status: 'Aktueller Status',
+
+    // --- Errors ---
+    no_permission_title: 'Keine Berechtigung',
+    no_permission_desc: 'Du benötigst Administrator-Rechte.',
+    unknown_command: '❌ Unbekannter Befehl',
+    error_occurred: 'Ein Fehler ist aufgetreten',
+
+    // --- Common UI ---
     back: 'Zurück',
     enabled: 'Aktiviert',
     disabled: 'Deaktiviert',
     enable: 'Aktivieren',
     disable: 'Deaktivieren',
     info: 'Information',
-    check_cooldown_title: 'Befehl im Cooldown',
-    check_cooldown_desc: 'Dieser Befehl kann nur einmal pro Stunde verwendet werden. Bitte versuche es erneut in: ',
   },
-  
-  // Andere Sprachen aus Platzgründen verkürzt - in Produktion alle einbinden
+
+  // ============================================================================
+  // FRENCH
+  // ============================================================================
   fr: {
+    // --- Setup Wizard ---
     setup_wizard_title: 'Assistant de configuration',
-    setup_wizard_desc: 'Bienvenue sur PixelPost! Configurons tout en quelques étapes.',
-    // ... rest of translations
+    setup_wizard_desc: 'Bienvenue sur PixelPost ! Configurons tout en quelques étapes.',
+    setup_step_language: 'Veuillez choisir votre langue préférée :',
+    setup_step_channel: 'Sélectionner un canal',
+    select_channel_placeholder: 'Choisissez un canal...',
+    setup_channel_instructions: 'Où dois‑je publier les jeux gratuits ? Sélectionnez un canal ci‑dessous ou utilisez le canal actuel.',
+    use_current_channel: 'Utiliser ce canal',
+    setup_step_stores: 'Sélectionner les boutiques',
+    setup_stores_instructions: 'Quelles boutiques dois‑je surveiller ? Cliquez pour activer/désactiver, puis cliquez sur "Terminer".',
+    finish_setup: 'Terminer la configuration',
+    cancel: 'Annuler',
+    language_selected: 'Langue sélectionnée',
+    channel_selected: 'Canal sélectionné',
+    store_toggled: 'Boutique mise à jour',
+    setup_complete_title: 'Configuration terminée !',
+    setup_complete_desc: 'Le bot est maintenant configuré et publiera automatiquement les jeux gratuits.',
+    step: 'Étape',
+  
+    // --- Status ---
+    status_title: 'Statut du bot',
+    status_active: '✅ Le bot est actif et publie dans',
+    status_inactive: '❌ Le bot n’est pas configuré',
+    status_channel: 'Canal',
+    status_stores: 'Boutiques actives',
+    status_language: 'Langue',
+    status_roles: 'Rôles mentionnés',
+    store_threads: 'Sujets de boutiques',
+    setup_required: 'Veuillez d’abord exécuter `/setup` pour configurer le bot.',
+    none: 'Aucun',
+    selected: 'Sélectionné',
+  
+    // --- Help ---
+    help_title: 'Aide & Commandes',
+    help_description: 'Voici toutes les commandes disponibles pour PixelPost :',
+    help_user_commands: 'Commandes utilisateur',
+    help_admin_commands: 'Commandes administrateur',
+    help_cmd_help: 'Afficher ce message d’aide',
+    help_cmd_status: 'Vérifier la configuration et le statut du bot',
+    help_cmd_setup: 'Lancer l’assistant de configuration',
+    help_cmd_check: 'Rechercher manuellement les jeux gratuits',
+    help_cmd_settings: 'Configurer tous les paramètres du bot',
+    help_links: 'Liens & Support',
+    help_links_text: '[Documentation](https://github.com/yourrepo) • [Support](https://discord.gg/support)',
+  
+    // --- Game Posts ---
+    free_title: 'GRATUIT !',
+    available_until: '⏰ Disponible jusqu’au',
+    get_now: '🔗 Obtenir maintenant',
+    original_price: '💰 Prix d’origine',
+    store_footer: 'À conserver pour toujours',
+    how_to_claim: '📋 Comment l’obtenir',
+  
+    // --- Check Command ---
+    check_running_title: 'Recherche de jeux',
+    check_running: 'Recherche de nouveaux jeux gratuits... Cela peut prendre jusqu’à 30 secondes.',
+    check_complete: '✅ Recherche terminée ! Les nouveaux jeux ont été publiés si disponibles.',
+    check_cooldown_title: 'Commande en cooldown',
+    check_cooldown_desc: 'Cette commande ne peut être utilisée qu’une fois par heure. Réessayez dans : ',
+  
+    // --- Settings ---
+    settings_title: 'Paramètres du bot',
+    settings_description: 'Configurez tous les paramètres du bot ici.',
+    settings_currency: 'Devise',
+    settings_notification_roles: 'Rôles de notification',
+    settings_reactions: 'Votes par réactions',
+    settings_dlcs: 'Publications DLC',
+    settings_include_dlcs: 'Inclure les DLC',
+    settings_games_only: 'Jeux uniquement',
+    settings_btn_general: 'Général',
+    settings_btn_stores: 'Boutiques',
+    settings_btn_language: 'Langue',
+    settings_btn_roles: 'Rôles',
+    settings_btn_channel: 'Canal',
+    settings_btn_reactions: 'Réactions',
+  
+    settings_general_title: 'Paramètres généraux',
+    settings_general_desc: 'Configurer l’affichage de la devise et les préférences de contenu.',
+    settings_toggle_dlcs: 'Activer/Désactiver les DLC',
+  
+    settings_stores_title: 'Configuration des boutiques',
+    settings_stores_desc: 'Sélectionnez les boutiques à surveiller pour les jeux gratuits.',
+  
+    settings_language_title: 'Paramètres de langue',
+    settings_language_desc: 'Choisissez votre langue préférée.',
+    current_language: 'Langue actuelle',
+  
+    settings_roles_title: 'Rôles de notification',
+    settings_roles_desc: 'Configurer les rôles à mentionner lors des publications.',
+    settings_general_role: 'Rôle général',
+    settings_store_roles: 'Rôles par boutique',
+    settings_add_general_role: 'Ajouter un rôle général',
+    settings_clear_general_roles: 'Supprimer tous les rôles',
+    settings_configure_store_roles: 'Configurer les rôles de boutique',
+  
+    settings_channel_title: 'Configuration du canal',
+    settings_channel_desc: 'Choisissez où le bot doit publier les jeux gratuits.',
+    current_channel: 'Canal actuel',
+  
+    settings_reactions_title: 'Votes par réactions',
+    settings_reactions_desc: 'Activer ou désactiver les votes par réactions.',
+    settings_reactions_info: 'Si activé, le bot ajoute 🔥 et ❄️ à chaque publication.',
+    current_status: 'Statut actuel',
+  
+    // --- Errors ---
+    no_permission_title: 'Permission refusée',
+    no_permission_desc: 'Vous devez être administrateur pour utiliser cette commande.',
+    unknown_command: '❌ Commande inconnue',
+    error_occurred: 'Une erreur est survenue',
+  
+    // --- Common UI ---
     back: 'Retour',
     enabled: 'Activé',
     disabled: 'Désactivé',
+    enable: 'Activer',
+    disable: 'Désactiver',
+    info: 'Information',
   },
   
+  // ============================================================================
+  // SPANISH
+  // ============================================================================
   es: {
+    // --- Setup Wizard ---
     setup_wizard_title: 'Asistente de configuración',
-    setup_wizard_desc: '¡Bienvenido a PixelPost! Configuremos todo en pocos pasos.',
-    // ... rest of translations
+    setup_wizard_desc: '¡Bienvenido a PixelPost! Configuremos todo en unos pocos pasos.',
+    setup_step_language: 'Selecciona tu idioma preferido:',
+    setup_step_channel: 'Seleccionar canal',
+    select_channel_placeholder: 'Elige un canal...',
+    setup_channel_instructions: '¿Dónde debo publicar los juegos gratis? Selecciona un canal o usa el canal actual.',
+    use_current_channel: 'Usar este canal',
+    setup_step_stores: 'Seleccionar tiendas',
+    setup_stores_instructions: '¿Qué tiendas debo monitorear? Haz clic para activar/desactivar y luego "Finalizar".',
+    finish_setup: 'Finalizar configuración',
+    cancel: 'Cancelar',
+    language_selected: 'Idioma seleccionado',
+    channel_selected: 'Canal seleccionado',
+    store_toggled: 'Tienda actualizada',
+    setup_complete_title: '¡Configuración completa!',
+    setup_complete_desc: 'El bot está configurado y publicará juegos gratis automáticamente.',
+    step: 'Paso',
+  
+    // --- Status ---
+    status_title: 'Estado del bot',
+    status_active: '✅ El bot está activo y publicando en',
+    status_inactive: '❌ El bot no está configurado',
+    status_channel: 'Canal',
+    status_stores: 'Tiendas activas',
+    status_language: 'Idioma',
+    status_roles: 'Roles mencionados',
+    store_threads: 'Hilos de tiendas',
+    setup_required: 'Ejecuta `/setup` primero para configurar el bot.',
+    none: 'Ninguno',
+    selected: 'Seleccionado',
+  
+    // --- Help ---
+    help_title: 'Ayuda y comandos',
+    help_description: 'Aquí están todos los comandos disponibles de PixelPost:',
+    help_user_commands: 'Comandos de usuario',
+    help_admin_commands: 'Comandos de administrador',
+    help_cmd_help: 'Mostrar este mensaje de ayuda',
+    help_cmd_status: 'Verificar configuración y estado del bot',
+    help_cmd_setup: 'Iniciar el asistente de configuración',
+    help_cmd_check: 'Buscar juegos gratis manualmente',
+    help_cmd_settings: 'Configurar todos los ajustes del bot',
+    help_links: 'Enlaces y soporte',
+    help_links_text: '[Documentación](https://github.com/yourrepo) • [Soporte](https://discord.gg/support)',
+  
+    // --- Game Posts ---
+    free_title: '¡GRATIS!',
+    available_until: '⏰ Disponible hasta',
+    get_now: '🔗 Obtener ahora',
+    original_price: '💰 Precio original',
+    store_footer: 'Gratis para siempre',
+    how_to_claim: '📋 Cómo obtenerlo',
+  
+    // --- Check Command ---
+    check_running_title: 'Buscando juegos',
+    check_running: 'Buscando nuevos juegos gratis... Esto puede tardar hasta 30 segundos.',
+    check_complete: '✅ ¡Búsqueda completa! Se han publicado nuevos juegos si están disponibles.',
+    check_cooldown_title: 'Comando en enfriamiento',
+    check_cooldown_desc: 'Este comando solo puede usarse una vez por hora. Inténtalo de nuevo en: ',
+  
+    // --- Settings ---
+    settings_title: 'Configuración del bot',
+    settings_description: 'Configura todos los ajustes del bot aquí.',
+    settings_currency: 'Moneda',
+    settings_notification_roles: 'Roles de notificación',
+    settings_reactions: 'Votación con reacciones',
+    settings_dlcs: 'Publicaciones de DLC',
+    settings_include_dlcs: 'Incluir DLCs',
+    settings_games_only: 'Solo juegos',
+    settings_btn_general: 'General',
+    settings_btn_stores: 'Tiendas',
+    settings_btn_language: 'Idioma',
+    settings_btn_roles: 'Roles',
+    settings_btn_channel: 'Canal',
+    settings_btn_reactions: 'Reacciones',
+  
+    settings_general_title: 'Configuración general',
+    settings_general_desc: 'Configura la moneda y las preferencias de contenido.',
+    settings_toggle_dlcs: 'Alternar publicaciones de DLC',
+  
+    settings_stores_title: 'Configuración de tiendas',
+    settings_stores_desc: 'Selecciona qué tiendas monitorear para juegos gratis.',
+  
+    settings_language_title: 'Configuración de idioma',
+    settings_language_desc: 'Elige tu idioma preferido.',
+    current_language: 'Idioma actual',
+  
+    settings_roles_title: 'Roles de notificación',
+    settings_roles_desc: 'Configura qué roles mencionar al publicar juegos.',
+    settings_general_role: 'Rol general',
+    settings_store_roles: 'Roles por tienda',
+    settings_add_general_role: 'Agregar rol general',
+    settings_clear_general_roles: 'Eliminar todos los roles',
+    settings_configure_store_roles: 'Configurar roles de tienda',
+  
+    settings_channel_title: 'Configuración de canal',
+    settings_channel_desc: 'Selecciona dónde publicar los juegos gratis.',
+    current_channel: 'Canal actual',
+  
+    settings_reactions_title: 'Votación con reacciones',
+    settings_reactions_desc: 'Activa o desactiva la votación con reacciones.',
+    settings_reactions_info: 'Si está activado, el bot añadirá 🔥 y ❄️ a cada publicación.',
+    current_status: 'Estado actual',
+  
+    // --- Errors ---
+    no_permission_title: 'Sin permiso',
+    no_permission_desc: 'Necesitas permisos de administrador.',
+    unknown_command: '❌ Comando desconocido',
+    error_occurred: 'Ocurrió un error',
+  
+    // --- Common UI ---
     back: 'Atrás',
     enabled: 'Activado',
     disabled: 'Desactivado',
+    enable: 'Activar',
+    disable: 'Desactivar',
+    info: 'Información',
   },
   
+  // ============================================================================
+  // ITALIAN
+  // ============================================================================
   it: {
+    // --- Setup Wizard ---
     setup_wizard_title: 'Assistente di configurazione',
-    setup_wizard_desc: 'Benvenuto in PixelPost! Configuriamo tutto in pochi passaggi.',
-    // ... rest of translations
+    setup_wizard_desc: 'Benvenuto su PixelPost! Configuriamo tutto in pochi passaggi.',
+    setup_step_language: 'Seleziona la tua lingua preferita:',
+    setup_step_channel: 'Seleziona canale',
+    select_channel_placeholder: 'Scegli un canale...',
+    setup_channel_instructions: 'Dove devo pubblicare i giochi gratuiti? Seleziona un canale o usa quello attuale.',
+    use_current_channel: 'Usa questo canale',
+    setup_step_stores: 'Seleziona negozi',
+    setup_stores_instructions: 'Quali negozi devo monitorare? Clicca per attivare/disattivare, poi "Completa".',
+    finish_setup: 'Completa configurazione',
+    cancel: 'Annulla',
+    language_selected: 'Lingua selezionata',
+    channel_selected: 'Canale selezionato',
+    store_toggled: 'Negozio aggiornato',
+    setup_complete_title: 'Configurazione completata!',
+    setup_complete_desc: 'Il bot è configurato e pubblicherà automaticamente i giochi gratuiti.',
+    step: 'Passo',
+  
+    // --- Status ---
+    status_title: 'Stato del bot',
+    status_active: '✅ Il bot è attivo e pubblica in',
+    status_inactive: '❌ Il bot non è configurato',
+    status_channel: 'Canale',
+    status_stores: 'Negozi attivi',
+    status_language: 'Lingua',
+    status_roles: 'Ruoli menzionati',
+    store_threads: 'Thread dei negozi',
+    setup_required: 'Esegui prima `/setup` per configurare il bot.',
+    none: 'Nessuno',
+    selected: 'Selezionato',
+  
+    // --- Help ---
+    help_title: 'Aiuto & Comandi',
+    help_description: 'Ecco tutti i comandi disponibili per PixelPost:',
+    help_user_commands: 'Comandi utente',
+    help_admin_commands: 'Comandi admin',
+    help_cmd_help: 'Mostra questo messaggio di aiuto',
+    help_cmd_status: 'Controlla configurazione e stato del bot',
+    help_cmd_setup: 'Avvia l’assistente di configurazione',
+    help_cmd_check: 'Cerca manualmente giochi gratuiti',
+    help_cmd_settings: 'Configura tutte le impostazioni del bot',
+    help_links: 'Link & Supporto',
+    help_links_text: '[Documentazione](https://github.com/yourrepo) • [Supporto](https://discord.gg/support)',
+  
+    // --- Game Posts ---
+    free_title: 'GRATIS!',
+    available_until: '⏰ Disponibile fino a',
+    get_now: '🔗 Ottieni ora',
+    original_price: '💰 Prezzo originale',
+    store_footer: 'Gratis per sempre',
+    how_to_claim: '📋 Come ottenerlo',
+  
+    // --- Check Command ---
+    check_running_title: 'Ricerca giochi',
+    check_running: 'Ricerca di nuovi giochi gratuiti... Potrebbe richiedere fino a 30 secondi.',
+    check_complete: '✅ Ricerca completata! Pubblicati nuovi giochi se disponibili.',
+    check_cooldown_title: 'Comando in cooldown',
+    check_cooldown_desc: 'Questo comando può essere usato solo una volta all’ora. Riprova tra: ',
+  
+    // --- Settings ---
+    settings_title: 'Impostazioni del bot',
+    settings_description: 'Configura tutte le impostazioni del bot qui.',
+    settings_currency: 'Valuta',
+    settings_notification_roles: 'Ruoli di notifica',
+    settings_reactions: 'Voto con reazioni',
+    settings_dlcs: 'Post DLC',
+    settings_include_dlcs: 'Includi DLC',
+    settings_games_only: 'Solo giochi',
+    settings_btn_general: 'Generale',
+    settings_btn_stores: 'Negozi',
+    settings_btn_language: 'Lingua',
+    settings_btn_roles: 'Ruoli',
+    settings_btn_channel: 'Canale',
+    settings_btn_reactions: 'Reazioni',
+  
+    settings_general_title: 'Impostazioni generali',
+    settings_general_desc: 'Configura valuta e preferenze dei contenuti.',
+    settings_toggle_dlcs: 'Attiva/Disattiva DLC',
+  
+    settings_stores_title: 'Configurazione negozi',
+    settings_stores_desc: 'Seleziona quali negozi monitorare per giochi gratuiti.',
+  
+    settings_language_title: 'Impostazioni lingua',
+    settings_language_desc: 'Scegli la tua lingua preferita.',
+    current_language: 'Lingua attuale',
+  
+    settings_roles_title: 'Ruoli di notifica',
+    settings_roles_desc: 'Configura quali ruoli menzionare nei post.',
+    settings_general_role: 'Ruolo generale',
+    settings_store_roles: 'Ruoli per negozio',
+    settings_add_general_role: 'Aggiungi ruolo generale',
+    settings_clear_general_roles: 'Rimuovi tutti i ruoli',
+    settings_configure_store_roles: 'Configura ruoli negozio',
+  
+    settings_channel_title: 'Configurazione canale',
+    settings_channel_desc: 'Scegli dove pubblicare i giochi gratuiti.',
+    current_channel: 'Canale attuale',
+  
+    settings_reactions_title: 'Voto con reazioni',
+    settings_reactions_desc: 'Attiva o disattiva il voto con reazioni.',
+    settings_reactions_info: 'Se attivato, il bot aggiunge 🔥 e ❄️ a ogni post.',
+    current_status: 'Stato attuale',
+  
+    // --- Errors ---
+    no_permission_title: 'Nessun permesso',
+    no_permission_desc: 'Devi essere amministratore per usare questo comando.',
+    unknown_command: '❌ Comando sconosciuto',
+    error_occurred: 'Si è verificato un errore',
+  
+    // --- Common UI ---
     back: 'Indietro',
-    enabled: 'Abilitato',
-    disabled: 'Disabilitato',
+    enabled: 'Attivato',
+    disabled: 'Disattivato',
+    enable: 'Attiva',
+    disable: 'Disattiva',
+    info: 'Informazioni',
   },
   
+  // ============================================================================
+  // PORTUGUESE
+  // ============================================================================
   pt: {
+    // --- Setup Wizard ---
     setup_wizard_title: 'Assistente de configuração',
     setup_wizard_desc: 'Bem-vindo ao PixelPost! Vamos configurar tudo em poucos passos.',
-    // ... rest of translations
+    setup_step_language: 'Selecione seu idioma preferido:',
+    setup_step_channel: 'Selecionar canal',
+    select_channel_placeholder: 'Escolha um canal...',
+    setup_channel_instructions: 'Onde devo postar jogos grátis? Escolha um canal ou use o canal atual.',
+    use_current_channel: 'Usar este canal',
+    setup_step_stores: 'Selecionar lojas',
+    setup_stores_instructions: 'Quais lojas devo monitorar? Clique para ativar/desativar e depois "Concluir".',
+    finish_setup: 'Concluir configuração',
+    cancel: 'Cancelar',
+    language_selected: 'Idioma selecionado',
+    channel_selected: 'Canal selecionado',
+    store_toggled: 'Loja atualizada',
+    setup_complete_title: 'Configuração concluída!',
+    setup_complete_desc: 'O bot está configurado e publicará jogos grátis automaticamente.',
+    step: 'Etapa',
+  
+    // --- Status ---
+    status_title: 'Status do bot',
+    status_active: '✅ O bot está ativo e publicando em',
+    status_inactive: '❌ O bot não está configurado',
+    status_channel: 'Canal',
+    status_stores: 'Lojas ativas',
+    status_language: 'Idioma',
+    status_roles: 'Papéis mencionados',
+    store_threads: 'Tópicos de lojas',
+    setup_required: 'Execute `/setup` primeiro para configurar o bot.',
+    none: 'Nenhum',
+    selected: 'Selecionado',
+  
+    // --- Help ---
+    help_title: 'Ajuda & Comandos',
+    help_description: 'Aqui estão todos os comandos disponíveis do PixelPost:',
+    help_user_commands: 'Comandos de usuário',
+    help_admin_commands: 'Comandos de administrador',
+    help_cmd_help: 'Mostrar esta mensagem de ajuda',
+    help_cmd_status: 'Verificar configuração e status do bot',
+    help_cmd_setup: 'Iniciar o assistente de configuração',
+    help_cmd_check: 'Buscar jogos grátis manualmente',
+    help_cmd_settings: 'Configurar todas as definições do bot',
+    help_links: 'Links & Suporte',
+    help_links_text: '[Documentação](https://github.com/yourrepo) • [Suporte](https://discord.gg/support)',
+  
+    // --- Game Posts ---
+    free_title: 'GRÁTIS!',
+    available_until: '⏰ Disponível até',
+    get_now: '🔗 Obter agora',
+    original_price: '💰 Preço original',
+    store_footer: 'Grátis para sempre',
+    how_to_claim: '📋 Como resgatar',
+  
+    // --- Check Command ---
+    check_running_title: 'Procurando jogos',
+    check_running: 'Procurando novos jogos grátis... Isso pode levar até 30 segundos.',
+    check_complete: '✅ Busca concluída! Novos jogos foram publicados se disponíveis.',
+    check_cooldown_title: 'Comando em cooldown',
+    check_cooldown_desc: 'Este comando só pode ser usado uma vez por hora. Tente novamente em: ',
+  
+    // --- Settings ---
+    settings_title: 'Configurações do bot',
+    settings_description: 'Configure todas as definições do bot aqui.',
+    settings_currency: 'Moeda',
+    settings_notification_roles: 'Papéis de notificação',
+    settings_reactions: 'Votação por reações',
+    settings_dlcs: 'Publicações de DLC',
+    settings_include_dlcs: 'Incluir DLCs',
+    settings_games_only: 'Somente jogos',
+    settings_btn_general: 'Geral',
+    settings_btn_stores: 'Lojas',
+    settings_btn_language: 'Idioma',
+    settings_btn_roles: 'Papéis',
+    settings_btn_channel: 'Canal',
+    settings_btn_reactions: 'Reações',
+  
+    settings_general_title: 'Configurações gerais',
+    settings_general_desc: 'Configure moeda e preferências de conteúdo.',
+    settings_toggle_dlcs: 'Ativar/Desativar DLCs',
+  
+    settings_stores_title: 'Configuração de lojas',
+    settings_stores_desc: 'Selecione quais lojas monitorar para jogos grátis.',
+  
+    settings_language_title: 'Configurações de idioma',
+    settings_language_desc: 'Escolha seu idioma preferido.',
+    current_language: 'Idioma atual',
+  
+    settings_roles_title: 'Papéis de notificação',
+    settings_roles_desc: 'Configure quais papéis mencionar ao publicar jogos.',
+    settings_general_role: 'Papel geral',
+    settings_store_roles: 'Papéis por loja',
+    settings_add_general_role: 'Adicionar papel geral',
+    settings_clear_general_roles: 'Remover todos os papéis',
+    settings_configure_store_roles: 'Configurar papéis de loja',
+  
+    settings_channel_title: 'Configuração de canal',
+    settings_channel_desc: 'Escolha onde o bot deve publicar jogos grátis.',
+    current_channel: 'Canal atual',
+  
+    settings_reactions_title: 'Votação por reações',
+    settings_reactions_desc: 'Ativar ou desativar votação por reações.',
+    settings_reactions_info: 'Se ativado, o bot adicionará 🔥 e ❄️ a cada publicação.',
+    current_status: 'Status atual',
+  
+    // --- Errors ---
+    no_permission_title: 'Sem permissão',
+    no_permission_desc: 'Você precisa ser administrador para usar este comando.',
+    unknown_command: '❌ Comando desconhecido',
+    error_occurred: 'Ocorreu um erro',
+  
+    // --- Common UI ---
     back: 'Voltar',
     enabled: 'Ativado',
     disabled: 'Desativado',
+    enable: 'Ativar',
+    disable: 'Desativar',
+    info: 'Informação',
   },
-  
+
+  // ============================================================================
+  // RUSSIAN
+  // ============================================================================
   ru: {
+    // --- Setup Wizard ---
     setup_wizard_title: 'Мастер настройки',
-    setup_wizard_desc: 'Добро пожаловать в PixelPost! Давайте все настроим за несколько шагов.',
-    // ... rest of translations
+    setup_wizard_desc: 'Добро пожаловать в PixelPost! Давайте настроим всё в несколько шагов.',
+    setup_step_language: 'Выберите предпочитаемый язык:',
+    setup_step_channel: 'Выбрать канал',
+    select_channel_placeholder: 'Выберите канал...',
+    setup_channel_instructions: 'Где публиковать бесплатные игры? Выберите канал или используйте текущий.',
+    use_current_channel: 'Использовать этот канал',
+    setup_step_stores: 'Выбрать магазины',
+    setup_stores_instructions: 'Какие магазины отслеживать? Нажмите для включения/выключения, затем "Завершить".',
+    finish_setup: 'Завершить настройку',
+    cancel: 'Отмена',
+    language_selected: 'Язык выбран',
+    channel_selected: 'Канал выбран',
+    store_toggled: 'Магазин обновлён',
+    setup_complete_title: 'Настройка завершена!',
+    setup_complete_desc: 'Бот настроен и будет автоматически публиковать бесплатные игры.',
+    step: 'Шаг',
+  
+    // --- Status ---
+    status_title: 'Статус бота',
+    status_active: '✅ Бот активен и публикует в',
+    status_inactive: '❌ Бот не настроен',
+    status_channel: 'Канал',
+    status_stores: 'Активные магазины',
+    status_language: 'Язык',
+    status_roles: 'Упомянутые роли',
+    store_threads: 'Темы магазинов',
+    setup_required: 'Пожалуйста, сначала выполните `/setup`.',
+    none: 'Нет',
+    selected: 'Выбрано',
+  
+    // --- Help ---
+    help_title: 'Помощь и команды',
+    help_description: 'Все доступные команды PixelPost:',
+    help_user_commands: 'Команды пользователя',
+    help_admin_commands: 'Команды администратора',
+    help_cmd_help: 'Показать это сообщение помощи',
+    help_cmd_status: 'Проверить конфигурацию и статус бота',
+    help_cmd_setup: 'Запустить мастер настройки',
+    help_cmd_check: 'Проверить бесплатные игры вручную',
+    help_cmd_settings: 'Настроить все параметры бота',
+    help_links: 'Ссылки и поддержка',
+    help_links_text: '[Документация](https://github.com/yourrepo) • [Поддержка](https://discord.gg/support)',
+  
+    // --- Game Posts ---
+    free_title: 'БЕСПЛАТНО!',
+    available_until: '⏰ Доступно до',
+    get_now: '🔗 Получить',
+    original_price: '💰 Оригинальная цена',
+    store_footer: 'Навсегда бесплатно',
+    how_to_claim: '📋 Как получить',
+  
+    // --- Check Command ---
+    check_running_title: 'Поиск игр',
+    check_running: 'Поиск новых бесплатных игр... Это может занять до 30 секунд.',
+    check_complete: '✅ Проверка завершена! Новые игры опубликованы, если доступны.',
+    check_cooldown_title: 'Команда на перезарядке',
+    check_cooldown_desc: 'Эту команду можно использовать раз в час. Повторите через: ',
+  
+    // --- Settings ---
+    settings_title: 'Настройки бота',
+    settings_description: 'Настройте все параметры бота здесь.',
+    settings_currency: 'Валюта',
+    settings_notification_roles: 'Роли уведомлений',
+    settings_reactions: 'Голосование реакциями',
+    settings_dlcs: 'Публикации DLC',
+    settings_include_dlcs: 'Включать DLC',
+    settings_games_only: 'Только игры',
+    settings_btn_general: 'Общее',
+    settings_btn_stores: 'Магазины',
+    settings_btn_language: 'Язык',
+    settings_btn_roles: 'Роли',
+    settings_btn_channel: 'Канал',
+    settings_btn_reactions: 'Реакции',
+  
+    settings_general_title: 'Общие настройки',
+    settings_general_desc: 'Настройте валюту и предпочтения контента.',
+    settings_toggle_dlcs: 'Переключить DLC',
+  
+    settings_stores_title: 'Настройки магазинов',
+    settings_stores_desc: 'Выберите магазины для отслеживания бесплатных игр.',
+  
+    settings_language_title: 'Настройки языка',
+    settings_language_desc: 'Выберите предпочитаемый язык.',
+    current_language: 'Текущий язык',
+  
+    settings_roles_title: 'Роли уведомлений',
+    settings_roles_desc: 'Настройте роли, которые будут упоминаться.',
+    settings_general_role: 'Общая роль',
+    settings_store_roles: 'Роли по магазинам',
+    settings_add_general_role: 'Добавить общую роль',
+    settings_clear_general_roles: 'Удалить все роли',
+    settings_configure_store_roles: 'Настроить роли магазинов',
+  
+    settings_channel_title: 'Настройки канала',
+    settings_channel_desc: 'Выберите канал для публикации бесплатных игр.',
+    current_channel: 'Текущий канал',
+  
+    settings_reactions_title: 'Голосование реакциями',
+    settings_reactions_desc: 'Включить или отключить голосование реакциями.',
+    settings_reactions_info: 'Если включено, бот добавит 🔥 и ❄️ к каждому посту.',
+    current_status: 'Текущий статус',
+  
+    // --- Errors ---
+    no_permission_title: 'Нет прав',
+    no_permission_desc: 'Требуются права администратора.',
+    unknown_command: '❌ Неизвестная команда',
+    error_occurred: 'Произошла ошибка',
+  
+    // --- Common UI ---
     back: 'Назад',
     enabled: 'Включено',
     disabled: 'Отключено',
+    enable: 'Включить',
+    disable: 'Отключить',
+    info: 'Информация',
   },
-  
+
+  // ============================================================================
+  // POLISH
+  // ============================================================================
   pl: {
+    // --- Setup Wizard ---
     setup_wizard_title: 'Kreator konfiguracji',
     setup_wizard_desc: 'Witaj w PixelPost! Skonfigurujmy wszystko w kilku krokach.',
-    // ... rest of translations
+    setup_step_language: 'Wybierz preferowany język:',
+    setup_step_channel: 'Wybierz kanał',
+    select_channel_placeholder: 'Wybierz kanał...',
+    setup_channel_instructions: 'Gdzie publikować darmowe gry? Wybierz kanał lub użyj bieżącego.',
+    use_current_channel: 'Użyj tego kanału',
+    setup_step_stores: 'Wybierz sklepy',
+    setup_stores_instructions: 'Które sklepy monitorować? Kliknij, aby włączyć/wyłączyć, a następnie "Zakończ".',
+    finish_setup: 'Zakończ konfigurację',
+    cancel: 'Anuluj',
+    language_selected: 'Wybrano język',
+    channel_selected: 'Wybrano kanał',
+    store_toggled: 'Zaktualizowano sklep',
+    setup_complete_title: 'Konfiguracja zakończona!',
+    setup_complete_desc: 'Bot jest skonfigurowany i będzie automatycznie publikował darmowe gry.',
+    step: 'Krok',
+  
+    // --- Status ---
+    status_title: 'Status bota',
+    status_active: '✅ Bot jest aktywny i publikuje w',
+    status_inactive: '❌ Bot nie jest skonfigurowany',
+    status_channel: 'Kanał',
+    status_stores: 'Aktywne sklepy',
+    status_language: 'Język',
+    status_roles: 'Wspomniane role',
+    store_threads: 'Wątki sklepów',
+    setup_required: 'Najpierw uruchom `/setup`, aby skonfigurować bota.',
+    none: 'Brak',
+    selected: 'Wybrano',
+  
+    // --- Help ---
+    help_title: 'Pomoc i komendy',
+    help_description: 'Oto wszystkie dostępne komendy PixelPost:',
+    help_user_commands: 'Komendy użytkownika',
+    help_admin_commands: 'Komendy administratora',
+    help_cmd_help: 'Wyświetl tę wiadomość pomocy',
+    help_cmd_status: 'Sprawdź konfigurację i status bota',
+    help_cmd_setup: 'Uruchom kreator konfiguracji',
+    help_cmd_check: 'Ręcznie sprawdź darmowe gry',
+    help_cmd_settings: 'Skonfiguruj wszystkie ustawienia bota',
+    help_links: 'Linki i wsparcie',
+    help_links_text: '[Dokumentacja](https://github.com/yourrepo) • [Wsparcie](https://discord.gg/support)',
+  
+    // --- Game Posts ---
+    free_title: 'ZA DARMO!',
+    available_until: '⏰ Dostępne do',
+    get_now: '🔗 Pobierz teraz',
+    original_price: '💰 Cena oryginalna',
+    store_footer: 'Na zawsze za darmo',
+    how_to_claim: '📋 Jak odebrać',
+  
+    // --- Check Command ---
+    check_running_title: 'Wyszukiwanie gier',
+    check_running: 'Wyszukiwanie nowych darmowych gier... Może to potrwać do 30 sekund.',
+    check_complete: '✅ Wyszukiwanie zakończone! Opublikowano nowe gry, jeśli dostępne.',
+    check_cooldown_title: 'Komenda w cooldownie',
+    check_cooldown_desc: 'Tę komendę można użyć raz na godzinę. Spróbuj ponownie za: ',
+  
+    // --- Settings ---
+    settings_title: 'Ustawienia bota',
+    settings_description: 'Skonfiguruj wszystkie ustawienia bota tutaj.',
+    settings_currency: 'Waluta',
+    settings_notification_roles: 'Role powiadomień',
+    settings_reactions: 'Głosowanie reakcjami',
+    settings_dlcs: 'Posty DLC',
+    settings_include_dlcs: 'Uwzględnij DLC',
+    settings_games_only: 'Tylko gry',
+    settings_btn_general: 'Ogólne',
+    settings_btn_stores: 'Sklepy',
+    settings_btn_language: 'Język',
+    settings_btn_roles: 'Role',
+    settings_btn_channel: 'Kanał',
+    settings_btn_reactions: 'Reakcje',
+  
+    settings_general_title: 'Ustawienia ogólne',
+    settings_general_desc: 'Skonfiguruj walutę i preferencje treści.',
+    settings_toggle_dlcs: 'Przełącz posty DLC',
+  
+    settings_stores_title: 'Konfiguracja sklepów',
+    settings_stores_desc: 'Wybierz sklepy do monitorowania darmowych gier.',
+  
+    settings_language_title: 'Ustawienia języka',
+    settings_language_desc: 'Wybierz preferowany język.',
+    current_language: 'Aktualny język',
+  
+    settings_roles_title: 'Role powiadomień',
+    settings_roles_desc: 'Skonfiguruj role wspominane w postach.',
+    settings_general_role: 'Rola ogólna',
+    settings_store_roles: 'Role sklepów',
+    settings_add_general_role: 'Dodaj rolę ogólną',
+    settings_clear_general_roles: 'Usuń wszystkie role',
+    settings_configure_store_roles: 'Konfiguruj role sklepów',
+  
+    settings_channel_title: 'Konfiguracja kanału',
+    settings_channel_desc: 'Wybierz kanał do publikowania darmowych gier.',
+    current_channel: 'Aktualny kanał',
+  
+    settings_reactions_title: 'Głosowanie reakcjami',
+    settings_reactions_desc: 'Włącz lub wyłącz głosowanie reakcjami.',
+    settings_reactions_info: 'Jeśli włączone, bot doda 🔥 i ❄️ do każdego posta.',
+    current_status: 'Aktualny status',
+  
+    // --- Errors ---
+    no_permission_title: 'Brak uprawnień',
+    no_permission_desc: 'Musisz być administratorem, aby użyć tej komendy.',
+    unknown_command: '❌ Nieznana komenda',
+    error_occurred: 'Wystąpił błąd',
+  
+    // --- Common UI ---
     back: 'Wstecz',
     enabled: 'Włączone',
     disabled: 'Wyłączone',
-  },
+    enable: 'Włącz',
+    disable: 'Wyłącz',
+    info: 'Informacje',
+  }
 };
