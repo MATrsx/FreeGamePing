@@ -910,7 +910,7 @@ async function handleComponent(interaction: any, env: Env, ctx: ExecutionContext
     return showStoreRoleMenu(interaction, env, guildId, store);
   }
   
-  if (parts[0] === 'select' && parts[1] === 'store' && parts[2] === 'role' && parts.length === 4) {
+  if (parts[0] === 'select' && parts[1] === 'store' && parts[2] === 'role' && parts[3] !== 'menu' && parts.length === 5) {
     const store = parts[3] as StoreType;
     const guildId = parts[4];
     return handleStoreRoleSelection(interaction, env, store, guildId);
@@ -921,7 +921,6 @@ async function handleComponent(interaction: any, env: Env, ctx: ExecutionContext
     const guildId = parts[4];
     return handleRemoveStoreRole(interaction, env, store, guildId);
   }
-  
   
   // Setup wizard handlers
   if (parts.includes('setup')) {
