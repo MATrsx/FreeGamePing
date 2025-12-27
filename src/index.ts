@@ -1762,22 +1762,29 @@ async function getFreeGamesForStore(store: StoreType): Promise<Game[] | null> {
     if (!response.ok) {
       console.error(`Error fetching ${store} games:`, response.status);
       return null;
-    } else if (response.status === 0) {
-        // Keine Spiele gefunden
-        return null;
     }
     
-    const data: GamerPowerGame[] = await response.json();
+    type GamerPowerResponse = GamerPowerGame[] | { status: number; message?: string };
+    const data: GamerPowerResponse = await response.json();
+
+    if (!Array.isArray(data)) {
+        // Hier ist data das Status-Objekt
+        if (data.status === 0) {
+            return null;
+        }
+    }
+
+    const games = data as GamerPowerGame[];
     
     // For Epic Games, also fetch from Epic's official API for enhanced data
     if (store === 'epic') {
       const epicGames = await getEpicGamesOfficial();
       if (epicGames && epicGames.length > 0) {
-        return mergeEpicGames(parseGamerPowerGames(data, store), epicGames);
+        return mergeEpicGames(parseGamerPowerGames(games, store), epicGames);
       }
     }
     
-    return parseGamerPowerGames(data, store);
+    return parseGamerPowerGames(games, store);
   } catch (error) {
     console.error(`Error fetching ${store} games:`, error);
     return null;
