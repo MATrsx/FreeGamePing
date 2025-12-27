@@ -1783,15 +1783,40 @@ async function handleCheckCommand(
   // Set cooldown
   await setCooldown(env, guildId);
 
+  const initialResponse = new Response(JSON.stringify({
+    type: InteractionResponseType.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE,
+    data: {
+      flags: 64 // Ephemeral
+    }
+  }), {
+    headers: { 'Content-Type': 'application/json' }
+  });
+
   // Run check in background
   ctx.waitUntil(
     (async () => {
+      try {
+      // Zeige "Checking..." Nachricht
+      await updateInteractionResponse(
+        env, 
+        interaction.token,
+        `🔍 ${t.check_running}\n${t.check_running}`
+      );
+
       await checkAndPostFreeGames(env);
       await updateInteractionResponse(
         env, 
         interaction.token, 
         t.check_complete
       );
+    } catch (error) {
+      console.error('Error during check:', error);
+      await updateInteractionResponse(
+        env,
+        interaction.token,
+        `❌ ${t.error_occurred}: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
     })()
   );
 
