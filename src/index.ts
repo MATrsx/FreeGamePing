@@ -1349,6 +1349,7 @@ async function handleCheckCommand(
   lang: Language
 ): Promise<Response> {
   const t = translations[lang];
+  const guildId = interaction.guild_id;
   
   if (!config || !config.enabled) {
     return respondWithEmbed({
@@ -1358,6 +1359,22 @@ async function handleCheckCommand(
     }, true);
   }
 
+  // Check cooldown
+  const cooldownCheck = await checkCooldown(env, guildId);
+  
+  if (cooldownCheck.onCooldown && cooldownCheck.remainingTime) {
+    const timeString = formatCooldownTime(cooldownCheck.remainingTime);
+    return respondWithEmbed({
+      title: '⏰ ' + t.check_cooldown_title,
+      description: t.check_cooldown_desc + timeString,
+      color: 0xff9900
+    }, true);
+  }
+
+  // Set cooldown
+  await setCooldown(env, guildId);
+
+  // Run check in background
   ctx.waitUntil(
     (async () => {
       await checkAndPostFreeGames(env);
@@ -1539,7 +1556,8 @@ async function checkAndPostFreeGames(env: Env): Promise<void> {
           if (!postedGames.includes(gameKey)) {
             console.log(`🆕 New free game: ${game.title} (${store})`);
             
-            const embed = createGameEmbed(game, t, guild.language, guild.currency);
+            // Create embed with guild's currency preference
+            const embed = createGameEmbed(game, t, guild.language, guild.currency, env);
             
             // Get mentions based on config
             let mentions = '';
@@ -1560,7 +1578,7 @@ async function checkAndPostFreeGames(env: Env): Promise<void> {
               targetId = guild.threadId;
             }
             
-            await sendToChannel(env, targetId, embed, mentions);
+            await sendToChannel(env, targetId, embed, mentions, guild);
             postedGames.push(gameKey);
             newGamesCount++;
           }
@@ -1583,7 +1601,33 @@ async function checkAndPostFreeGames(env: Env): Promise<void> {
   }
 }
 
-function createGameEmbed(game: Game, t: any, lang: Language, currency: Currency): any {
+function detectIfDLC(title: string, description: string): boolean {
+  const dlcKeywords = [
+    'dlc', 'expansion', 'add-on', 'addon', 'content pack', 
+    'season pass', 'downloadable content', 'pack', 'bundle'
+  ];
+  
+  const titleLower = title.toLowerCase();
+  const descLower = description.toLowerCase();
+  
+  // Check if title contains DLC keywords
+  for (const keyword of dlcKeywords) {
+    if (titleLower.includes(keyword)) {
+      return true;
+    }
+  }
+  
+  // Check description for DLC indicators
+  if (descLower.includes('requires the base game') || 
+      descLower.includes('requires base game') ||
+      descLower.includes('expansion for')) {
+    return true;
+  }
+  
+  return false;
+}
+
+async function createGameEmbed(game: Game, t: any, lang: Language, currency: Currency, env: Env): Promise<any> {
   const endTimestamp = Math.floor(new Date(game.endDate).getTime() / 1000);
   
   const embed: any = {
@@ -1615,11 +1659,13 @@ function createGameEmbed(game: Game, t: any, lang: Language, currency: Currency)
   });
   
   if (game.price && game.price.original > 0) {
-    // Use the guild's preferred currency
+    // Convert price to guild's preferred currency using API
+    const convertedPrice = await convertCurrency(game.price.original, game.price.currency, currency, env);
+    
     const priceFormatted = new Intl.NumberFormat(getLocaleForLanguage(lang), {
       style: 'currency',
       currency: currency
-    }).format(game.price.original);
+    }).format(convertedPrice);
     
     embed.fields.push({
       name: t.original_price,
@@ -1652,16 +1698,17 @@ function createGameEmbed(game: Game, t: any, lang: Language, currency: Currency)
  * @param channelId - ID des Ziel-Channels
  * @param embed - Discord Embed Objekt
  * @param mentions - Optional: Rollen-Mentions
+ * @param config - Optional: Guild-Konfiguration
  * @returns Promise<boolean> - true bei Erfolg
  */
-async function sendToChannel(env: Env, channelId: string, embed: any, mentions?: string): Promise<boolean> {
+async function sendToChannel(env: Env, channelId: string, embed: any, mentions?: string, config?: GuildConfig): Promise<boolean> {
   try {
     // Prüfe ob es ein Forum-Channel ist
     const channelInfo = await getChannelInfo(env, channelId);
     
     if (channelInfo && channelInfo.type === 15) {
       // Forum Channel - erstelle neuen Thread/Post
-      return await createForumPost(env, channelId, embed, mentions);
+      return await createForumPost(env, channelId, embed, mentions, config);
     } else {
       // Normaler Channel - sende normale Nachricht
       const payload: any = { embeds: [embed] };
@@ -1683,6 +1730,13 @@ async function sendToChannel(env: Env, channelId: string, embed: any, mentions?:
         return false;
       }
       
+      const message = await response.json();
+      
+      // Add reactions if enabled
+      if (config?.reactions) {
+        await addReactionsToMessage(env, channelId, message.id);
+      }
+      
       return true;
     }
   } catch (error) {
@@ -1697,9 +1751,10 @@ async function sendToChannel(env: Env, channelId: string, embed: any, mentions?:
  * @param forumChannelId - ID des Forum-Channels
  * @param embed - Discord Embed Objekt
  * @param mentions - Optional: Rollen-Mentions
+ * @param config - Optional: Guild-Konfiguration
  * @returns Promise<boolean> - true bei Erfolg
  */
-async function createForumPost(env: Env, forumChannelId: string, embed: any, mentions?: string): Promise<boolean> {
+async function createForumPost(env: Env, forumChannelId: string, embed: any, mentions?: string, config?: GuildConfig): Promise<boolean> {
   try {
     // Extrahiere Spiel-Titel aus dem Embed für den Thread-Namen
     const gameTitle = embed.title.replace('🎁 ', '').split(' - ')[0];
@@ -1739,10 +1794,38 @@ async function createForumPost(env: Env, forumChannelId: string, embed: any, men
     const thread = await response.json();
     console.log(`✅ Created forum post: ${threadName} (ID: ${thread.id})`);
     
+    // Add reactions if enabled
+    if (config?.reactions && thread.message?.id) {
+      await addReactionsToMessage(env, thread.id, thread.message.id);
+    }
+    
     return true;
   } catch (error) {
     console.error('Error creating forum post:', error);
     return false;
+  }
+}
+
+async function addReactionsToMessage(env: Env, channelId: string, messageId: string): Promise<void> {
+  try {
+    const reactions = ['🔥', '❄️'];
+    
+    for (const emoji of reactions) {
+      await fetch(
+        `https://discord.com/api/v10/channels/${channelId}/messages/${messageId}/reactions/${encodeURIComponent(emoji)}/@me`,
+        {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bot ${env.DISCORD_BOT_TOKEN}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      // Small delay to avoid rate limiting
+      await new Promise(resolve => setTimeout(resolve, 300));
+    }
+  } catch (error) {
+    console.error('Error adding reactions:', error);
   }
 }
 
@@ -1768,7 +1851,6 @@ async function getFreeGamesForStore(store: StoreType): Promise<Game[] | null> {
     const data: GamerPowerResponse = await response.json();
 
     if (!Array.isArray(data)) {
-        // Hier ist data das Status-Objekt
         if (data.status === 0) {
             return null;
         }
@@ -1796,6 +1878,9 @@ function parseGamerPowerGames(data: GamerPowerGame[], store: StoreType): Game[] 
   
   for (const item of data) {
     if (item.type !== 'Game' || item.status === 'Expired') continue;
+
+    // Detect if it's a DLC
+    const isDLC = detectIfDLC(item.title, item.description);
     
     let originalPrice = 0;
     if (item.worth && item.worth !== 'N/A') {
@@ -1828,7 +1913,8 @@ function parseGamerPowerGames(data: GamerPowerGame[], store: StoreType): Game[] 
         discount: 100,
         currency: 'USD'
       } : undefined,
-      instructions: item.instructions
+      instructions: item.instructions,
+      isDLC: isDLC
     });
   }
   
@@ -1867,6 +1953,9 @@ function parseEpicGamesOfficial(data: any): Game[] {
     if (isFree && hasPromotion) {
       const offer = game.promotions.promotionalOffers[0].promotionalOffers[0];
       
+      // Detect if it's a DLC
+      const isDLC = detectIfDLC(game.title, game.description || '');
+      
       let imageUrl: string | null = null;
       const images = game.keyImages || [];
       for (const img of images) {
@@ -1894,7 +1983,8 @@ function parseEpicGamesOfficial(data: any): Game[] {
           original: originalPrice / 100,
           discount: 100,
           currency: 'USD'
-        }
+        },
+        isDLC: isDLC
       });
     }
   }
@@ -2340,6 +2430,121 @@ function formatCooldownTime(ms: number): string {
 }
 
 // ============================================================================
+// CURRENCY CONVERSION
+// ============================================================================
+
+/**
+ * Converts currency using exchangerate-api.com (free tier: 1500 requests/month)
+ * Falls back to cached rates if API fails
+ */
+async function convertCurrency(
+  amount: number, 
+  fromCurrency: string, 
+  toCurrency: Currency,
+  env: Env
+): Promise<number> {
+  // If currencies match, return original amount
+  if (fromCurrency === toCurrency) {
+    return amount;
+  }
+  
+  try {
+    // Try to get cached rates first (valid for 24 hours)
+    const cacheKey = `exchange_rates_${fromCurrency}`;
+    const cached = await env.POSTED_GAMES.get(cacheKey, 'json') as ExchangeRateCache | null;
+    
+    // Use cached rates if still valid
+    if (cached && cached.timestamp > Date.now() - 24 * 60 * 60 * 1000) {
+      const rate = cached.rates[toCurrency];
+      if (rate) {
+        return Math.round(amount * rate * 100) / 100;
+      }
+    }
+    
+    // Fetch fresh rates from API
+    const rates = await fetchExchangeRates(fromCurrency, env);
+    
+    if (rates && rates[toCurrency]) {
+      // Cache the rates for 24 hours
+      const cacheData: ExchangeRateCache = {
+        rates: rates,
+        timestamp: Date.now()
+      };
+      await env.POSTED_GAMES.put(cacheKey, JSON.stringify(cacheData), {
+        expirationTtl: 86400 // 24 hours
+      });
+      
+      return Math.round(amount * rates[toCurrency] * 100) / 100;
+    }
+    
+    // Fallback to static rates if API fails
+    return convertCurrencyFallback(amount, fromCurrency, toCurrency);
+    
+  } catch (error) {
+    console.error('Currency conversion error:', error);
+    return convertCurrencyFallback(amount, fromCurrency, toCurrency);
+  }
+}
+
+async function fetchExchangeRates(baseCurrency: string, env: Env): Promise<Record<string, number> | null> {
+  try {
+    const response = await fetch(
+      `https://open.exchangerate-api.com/v6/latest/${baseCurrency.toUpperCase()}`,
+      {
+        headers: {
+          'User-Agent': 'PixelPost-Discord-Bot/1.0'
+        }
+      }
+    );
+    
+    if (!response.ok) {
+      console.error('Exchange rate API error:', response.status);
+      return null;
+    }
+    
+    const data = await response.json();
+    
+    if (data.result === 'success' && data.rates) {
+      return data.rates;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error fetching exchange rates:', error);
+    return null;
+  }
+}
+
+/**
+ * Fallback conversion using static rates (updated periodically)
+ * Used when API is unavailable or rate limit is exceeded
+ */
+function convertCurrencyFallback(amount: number, fromCurrency: string, toCurrency: Currency): number {
+  // Static rates as fallback (USD as base, updated: December 2024)
+  const rates: Record<string, number> = {
+    'USD': 1.0,
+    'EUR': 0.92,
+    'GBP': 0.79,
+    'JPY': 149.50,
+    'AUD': 1.53,
+    'CAD': 1.36,
+    'CHF': 0.88,
+    'CNY': 7.24,
+    'RUB': 92.50,
+    'BRL': 4.97
+  };
+  
+  // Convert to USD first, then to target currency
+  const fromRate = rates[fromCurrency.toUpperCase()] || 1.0;
+  const toRate = rates[toCurrency] || 1.0;
+  
+  const amountInUSD = amount / fromRate;
+  const convertedAmount = amountInUSD * toRate;
+  
+  return Math.round(convertedAmount * 100) / 100;
+}
+
+// ============================================================================
 // UTILITY FUNCTIONS
 // ============================================================================
 
@@ -2434,6 +2639,11 @@ interface GamerPowerGame {
   status: string;
   gamerpower_url: string;
   open_giveaway: string;
+}
+
+interface ExchangeRateCache {
+  rates: Record<string, number>;
+  timestamp: number;
 }
 
 // ============================================================================
