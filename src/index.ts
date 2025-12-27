@@ -2625,6 +2625,70 @@ const translations: Record<Language, Record<string, string>> = {
     // Other
     unknown_command: '❌ Unknown command',
     error_occurred: 'An error occurred',
+    
+    // Settings Main
+    settings_title: 'Bot Settings',
+    settings_description: 'Configure all bot settings from here. Click a button below to customize a specific setting.',
+    settings_currency: 'Currency',
+    settings_notification_roles: 'Notification Roles',
+    settings_reactions: 'Reaction Voting',
+    settings_dlcs: 'DLC Posts',
+    settings_include_dlcs: 'Include DLCs',
+    settings_games_only: 'Games Only',
+    
+    // Settings Buttons
+    settings_btn_general: 'General',
+    settings_btn_stores: 'Stores',
+    settings_btn_language: 'Language',
+    settings_btn_roles: 'Roles',
+    settings_btn_channel: 'Channel',
+    settings_btn_reactions: 'Reactions',
+    
+    // General Settings
+    settings_general_title: 'General Settings',
+    settings_general_desc: 'Configure currency display and content preferences.',
+    settings_toggle_dlcs: 'Toggle DLC Posts',
+    
+    // Store Settings
+    settings_stores_title: 'Store Configuration',
+    settings_stores_desc: 'Select which game stores to monitor for free games.',
+    
+    // Language Settings
+    settings_language_title: 'Language Settings',
+    settings_language_desc: 'Choose your preferred language for bot messages.',
+    current_language: 'Current Language',
+    
+    // Role Settings
+    settings_roles_title: 'Notification Roles',
+    settings_roles_desc: 'Configure which roles to mention when posting free games.',
+    settings_general_role: 'General Notification Role',
+    settings_store_roles: 'Store-Specific Roles',
+    settings_add_general_role: 'Add General Role',
+    settings_clear_general_roles: 'Clear All Roles',
+    settings_configure_store_roles: 'Configure Store Roles',
+    
+    // Channel Settings
+    settings_channel_title: 'Channel Configuration',
+    settings_channel_desc: 'Select where the bot should post free game announcements.',
+    current_channel: 'Current Channel',
+    
+    // Reaction Settings
+    settings_reactions_title: 'Reaction Voting',
+    settings_reactions_desc: 'Enable or disable reaction voting on game posts.',
+    settings_reactions_info: 'When enabled, the bot will add 🔥 (hot deal) and ❄️ (not interested) reactions to each post, allowing users to vote.',
+    current_status: 'Current Status',
+    
+    // Common
+    back: 'Back',
+    enabled: 'Enabled',
+    disabled: 'Disabled',
+    enable: 'Enable',
+    disable: 'Disable',
+    info: 'Information',
+    
+    // Check Command
+    check_cooldown_title: 'Command on Cooldown',
+    check_cooldown_desc: 'This command can only be used once per hour. Please try again in: ',
   },
   
   de: {
@@ -2698,68 +2762,68 @@ const translations: Record<Language, Record<string, string>> = {
     error_occurred: 'Ein Fehler ist aufgetreten',
 
     // Settings Main
-    settings_title: 'Bot Settings',
-    settings_description: 'Configure all bot settings from here. Click a button below to customize a specific setting.',
-    settings_currency: 'Currency',
-    settings_notification_roles: 'Notification Roles',
-    settings_reactions: 'Reaction Voting',
-    settings_dlcs: 'DLC Posts',
-    settings_include_dlcs: 'Include DLCs',
-    settings_games_only: 'Games Only',
+    settings_title: 'Bot-Einstellungen',
+    settings_description: 'Konfiguriere alle Bot-Einstellungen von hier aus. Klicke auf eine Schaltfläche unten, um eine bestimmte Einstellung anzupassen.',
+    settings_currency: 'Währung',
+    settings_notification_roles: 'Benachrichtigungsrollen',
+    settings_reactions: 'Reaktions-Abstimmung',
+    settings_dlcs: 'DLC-Beiträge',
+    settings_include_dlcs: 'DLCs einschließen',
+    settings_games_only: 'Nur Spiele',
     
     // Settings Buttons
-    settings_btn_general: 'General',
+    settings_btn_general: 'Allgemein',
     settings_btn_stores: 'Stores',
-    settings_btn_language: 'Language',
-    settings_btn_roles: 'Roles',
-    settings_btn_channel: 'Channel',
-    settings_btn_reactions: 'Reactions',
+    settings_btn_language: 'Sprache',
+    settings_btn_roles: 'Rollen',
+    settings_btn_channel: 'Kanal',
+    settings_btn_reactions: 'Reaktionen',
     
     // General Settings
-    settings_general_title: 'General Settings',
-    settings_general_desc: 'Configure currency display and content preferences.',
-    settings_toggle_dlcs: 'Toggle DLC Posts',
+    settings_general_title: 'Allgemeine Einstellungen',
+    settings_general_desc: 'Konfiguriere Währungsanzeige und Inhaltseinstellungen.',
+    settings_toggle_dlcs: 'DLC-Beiträge umschalten',
     
     // Store Settings
-    settings_stores_title: 'Store Configuration',
-    settings_stores_desc: 'Select which game stores to monitor for free games.',
+    settings_stores_title: 'Store-Konfiguration',
+    settings_stores_desc: 'Wähle aus, welche Game-Stores auf kostenlose Spiele überwacht werden sollen.',
     
     // Language Settings
-    settings_language_title: 'Language Settings',
-    settings_language_desc: 'Choose your preferred language for bot messages.',
-    current_language: 'Current Language',
+    settings_language_title: 'Spracheinstellungen',
+    settings_language_desc: 'Wähle deine bevorzugte Sprache für Bot-Nachrichten.',
+    current_language: 'Aktuelle Sprache',
     
     // Role Settings
-    settings_roles_title: 'Notification Roles',
-    settings_roles_desc: 'Configure which roles to mention when posting free games.',
-    settings_general_role: 'General Notification Role',
-    settings_store_roles: 'Store-Specific Roles',
-    settings_add_general_role: 'Add General Role',
-    settings_clear_general_roles: 'Clear All Roles',
-    settings_configure_store_roles: 'Configure Store Roles',
+    settings_roles_title: 'Benachrichtigungsrollen',
+    settings_roles_desc: 'Konfiguriere, welche Rollen beim Posten kostenloser Spiele erwähnt werden sollen.',
+    settings_general_role: 'Allgemeine Benachrichtigungsrolle',
+    settings_store_roles: 'Store-spezifische Rollen',
+    settings_add_general_role: 'Allgemeine Rolle hinzufügen',
+    settings_clear_general_roles: 'Alle Rollen löschen',
+    settings_configure_store_roles: 'Store-Rollen konfigurieren',
     
     // Channel Settings
-    settings_channel_title: 'Channel Configuration',
-    settings_channel_desc: 'Select where the bot should post free game announcements.',
-    current_channel: 'Current Channel',
+    settings_channel_title: 'Kanal-Konfiguration',
+    settings_channel_desc: 'Wähle aus, wo der Bot kostenlose Spiele ankündigen soll.',
+    current_channel: 'Aktueller Kanal',
     
     // Reaction Settings
-    settings_reactions_title: 'Reaction Voting',
-    settings_reactions_desc: 'Enable or disable reaction voting on game posts.',
-    settings_reactions_info: 'When enabled, the bot will add 🔥 (hot deal) and ❄️ (not interested) reactions to each post, allowing users to vote.',
-    current_status: 'Current Status',
+    settings_reactions_title: 'Reaktions-Abstimmung',
+    settings_reactions_desc: 'Aktiviere oder deaktiviere Reaktions-Abstimmungen bei Spiele-Posts.',
+    settings_reactions_info: 'Wenn aktiviert, fügt der Bot 🔥 (heißes Angebot) und ❄️ (nicht interessiert) Reaktionen zu jedem Beitrag hinzu, damit Nutzer abstimmen können.',
+    current_status: 'Aktueller Status',
     
     // Common
-    back: 'Back',
-    enabled: 'Enabled',
-    disabled: 'Disabled',
-    enable: 'Enable',
-    disable: 'Disable',
+    back: 'Zurück',
+    enabled: 'Aktiviert',
+    disabled: 'Deaktiviert',
+    enable: 'Aktivieren',
+    disable: 'Deaktivieren',
     info: 'Information',
     
     // Check Command
-    check_cooldown_title: 'Command on Cooldown',
-    check_cooldown_desc: 'This command can only be used once per hour. Please try again in: ',
+    check_cooldown_title: 'Befehl im Cooldown',
+    check_cooldown_desc: 'Dieser Befehl kann nur einmal pro Stunde verwendet werden. Bitte versuche es erneut in: ',
   },
   
   fr: {
