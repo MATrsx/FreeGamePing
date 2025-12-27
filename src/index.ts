@@ -903,14 +903,25 @@ async function handleComponent(interaction: any, env: Env, ctx: ExecutionContext
   if (parts[0] === 'select' && parts[1] === 'general' && parts[2] === 'role') {
     return handleGeneralRoleSelection(interaction, env, parts[3]);
   }
+
+  if (parts[0] === 'select' && parts[1] === 'store' && parts[2] === 'role' && parts[3] === 'menu') {
+    const store = parts[4] as StoreType;
+    const guildId = parts[5];
+    return showStoreRoleMenu(interaction, env, guildId, store);
+  }
   
-  if (parts[0] === 'select' && parts[1] === 'store' && parts[2] === 'role') {
-    return handleStoreRoleSelection(interaction, env, parts[3], parts[4]);
+  if (parts[0] === 'select' && parts[1] === 'store' && parts[2] === 'role' && parts.length === 4) {
+    const store = parts[3] as StoreType;
+    const guildId = parts[4];
+    return handleStoreRoleSelection(interaction, env, store, guildId);
   }
   
   if (parts[0] === 'remove' && parts[1] === 'store' && parts[2] === 'role') {
-    return handleRemoveStoreRole(interaction, env, parts[3], parts[4]);
+    const store = parts[3] as StoreType;
+    const guildId = parts[4];
+    return handleRemoveStoreRole(interaction, env, store, guildId);
   }
+  
   
   // Setup wizard handlers
   if (parts.includes('setup')) {
@@ -1150,15 +1161,9 @@ async function handleConfigureStoreRoles(
 async function handleStoreRoleSelection(
   interaction: any,
   env: Env,
-  action: string,
+  store: StoreType,
   guildId: string
 ): Promise<Response> {
-  // action kann 'menu' oder der store-name sein
-  if (action === 'menu') {
-    const store = interaction.data.custom_id.split('_')[4] as StoreType;
-    return showStoreRoleMenu(interaction, env, guildId, store);
-  }
-  
   // Wenn eine Rolle ausgewählt wurde
   const selectedValue = interaction.data.values?.[0];
   if (!selectedValue) {
@@ -1169,7 +1174,6 @@ async function handleStoreRoleSelection(
     }, true);
   }
   
-  const store = action as StoreType;
   const roleId = selectedValue.replace('role_', '');
   
   const config = await getGuildConfig(env, guildId);
