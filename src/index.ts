@@ -887,6 +887,31 @@ async function handleComponent(interaction: any, env: Env, ctx: ExecutionContext
     return handleSettingUpdate(interaction, env, parts);
   }
   
+  // Role management handlers - NEU
+  if (parts[0] === 'add' && parts[1] === 'general' && parts[2] === 'role') {
+    return handleAddGeneralRole(interaction, env, parts[3]);
+  }
+  
+  if (parts[0] === 'clear' && parts[1] === 'general' && parts[2] === 'roles') {
+    return handleClearGeneralRoles(interaction, env, parts[3]);
+  }
+  
+  if (parts[0] === 'configure' && parts[1] === 'store' && parts[2] === 'roles') {
+    return handleConfigureStoreRoles(interaction, env, parts[3]);
+  }
+  
+  if (parts[0] === 'select' && parts[1] === 'general' && parts[2] === 'role') {
+    return handleGeneralRoleSelection(interaction, env, parts[3]);
+  }
+  
+  if (parts[0] === 'select' && parts[1] === 'store' && parts[2] === 'role') {
+    return handleStoreRoleSelection(interaction, env, parts[3], parts[4]);
+  }
+  
+  if (parts[0] === 'remove' && parts[1] === 'store' && parts[2] === 'role') {
+    return handleRemoveStoreRole(interaction, env, parts[3], parts[4]);
+  }
+  
   // Setup wizard handlers
   if (parts.includes('setup')) {
     return handleSetupComponent(interaction, env, parts[0], parts[1], parts[2]);
@@ -903,6 +928,387 @@ async function handleComponent(interaction: any, env: Env, ctx: ExecutionContext
   }), {
     headers: { 'Content-Type': 'application/json' }
   });
+}
+
+async function handleAddGeneralRole(
+  interaction: any,
+  env: Env,
+  guildId: string
+): Promise<Response> {
+  const config = await getGuildConfig(env, guildId);
+  if (!config) {
+    return respondWithEmbed({
+      title: '❌ Error',
+      description: 'Configuration not found',
+      color: 0xff5555
+    }, true);
+  }
+  
+  const t = translations[config.language];
+  
+  // Hole alle Rollen vom Server
+  const roles = await fetchGuildRoles(env, guildId);
+  
+  const embed = {
+    title: '👥 ' + t.settings_add_general_role,
+    description: 'Select a role to add to general notifications. This role will be mentioned for all free game posts.',
+    color: 0x5865F2,
+    fields: [
+      {
+        name: '📋 ' + t.info,
+        value: 'Choose a role from the dropdown below. This role will be mentioned when posting free games from any store.',
+        inline: false
+      }
+    ],
+    footer: { text: 'PixelPost • Role Settings' }
+  };
+
+  const components = [];
+  
+  // Dropdown für Rollen-Auswahl
+  if (roles && roles.length > 0) {
+    const roleOptions = roles
+      .filter(role => role.name !== '@everyone' && !role.managed) // Filter @everyone und Bot-Rollen
+      .slice(0, 25) // Discord limit
+      .map(role => ({
+        label: role.name.length > 100 ? role.name.substring(0, 97) + '...' : role.name,
+        value: `role_${role.id}`,
+        description: `Role ID: ${role.id}`,
+        emoji: { name: '👥' },
+        default: config.mentionRoles.includes(role.id)
+      }));
+
+    if (roleOptions.length > 0) {
+      components.push({
+        type: ComponentType.ACTION_ROW,
+        components: [
+          {
+            type: ComponentType.SELECT_MENU,
+            custom_id: `select_general_role_${guildId}`,
+            placeholder: 'Choose a role...',
+            min_values: 1,
+            max_values: 1,
+            options: roleOptions
+          }
+        ]
+      });
+    }
+  }
+  
+  components.push({
+    type: ComponentType.ACTION_ROW,
+    components: [
+      {
+        type: ComponentType.BUTTON,
+        style: ButtonStyle.SECONDARY,
+        label: t.back,
+        emoji: { name: '◀️' },
+        custom_id: `settings_roles_${guildId}`
+      }
+    ]
+  });
+
+  return new Response(JSON.stringify({
+    type: InteractionResponseType.UPDATE_MESSAGE,
+    data: {
+      embeds: [embed],
+      components
+    }
+  }), {
+    headers: { 'Content-Type': 'application/json' }
+  });
+}
+
+async function handleGeneralRoleSelection(
+  interaction: any,
+  env: Env,
+  guildId: string
+): Promise<Response> {
+  const selectedValue = interaction.data.values?.[0];
+  if (!selectedValue) {
+    return respondWithEmbed({
+      title: '❌ Error',
+      description: 'No role selected',
+      color: 0xff5555
+    }, true);
+  }
+  
+  const roleId = selectedValue.replace('role_', '');
+  const config = await getGuildConfig(env, guildId);
+  
+  if (!config) {
+    return respondWithEmbed({
+      title: '❌ Error',
+      description: 'Configuration not found',
+      color: 0xff5555
+    }, true);
+  }
+  
+  // Füge Rolle hinzu wenn noch nicht vorhanden
+  if (!config.mentionRoles.includes(roleId)) {
+    config.mentionRoles.push(roleId);
+    await env.GUILD_CONFIGS.put(guildId, JSON.stringify(config));
+  }
+  
+  const t = translations[config.language];
+  return handleRolesSettings(interaction, config, t, guildId);
+}
+
+async function handleClearGeneralRoles(
+  interaction: any,
+  env: Env,
+  guildId: string
+): Promise<Response> {
+  const config = await getGuildConfig(env, guildId);
+  if (!config) {
+    return respondWithEmbed({
+      title: '❌ Error',
+      description: 'Configuration not found',
+      color: 0xff5555
+    }, true);
+  }
+  
+  config.mentionRoles = [];
+  await env.GUILD_CONFIGS.put(guildId, JSON.stringify(config));
+  
+  const t = translations[config.language];
+  return handleRolesSettings(interaction, config, t, guildId);
+}
+
+async function handleConfigureStoreRoles(
+  interaction: any,
+  env: Env,
+  guildId: string
+): Promise<Response> {
+  const config = await getGuildConfig(env, guildId);
+  if (!config) {
+    return respondWithEmbed({
+      title: '❌ Error',
+      description: 'Configuration not found',
+      color: 0xff5555
+    }, true);
+  }
+  
+  const t = translations[config.language];
+  
+  const embed = {
+    title: '📦 ' + t.settings_store_roles,
+    description: 'Configure store-specific notification roles. These roles will be mentioned only for their respective stores.',
+    color: 0x5865F2,
+    fields: config.stores.map(store => ({
+      name: `${getStoreEmoji(store)} ${storeNames[store]}`,
+      value: config.storeRoles?.[store] 
+        ? `<@&${config.storeRoles[store]}>` 
+        : t.none,
+      inline: true
+    })),
+    footer: { text: 'PixelPost • Store Role Settings' }
+  };
+
+  const storeButtons = config.stores.map(store => ({
+    type: ComponentType.BUTTON,
+    style: config.storeRoles?.[store] ? ButtonStyle.SUCCESS : ButtonStyle.PRIMARY,
+    label: storeNames[store],
+    emoji: { name: getStoreEmoji(store) },
+    custom_id: `select_store_role_menu_${store}_${guildId}`
+  }));
+
+  const components = [];
+  
+  // Aufteilen in Rows (max 5 Buttons pro Row)
+  for (let i = 0; i < storeButtons.length; i += 5) {
+    components.push({
+      type: ComponentType.ACTION_ROW,
+      components: storeButtons.slice(i, i + 5)
+    });
+  }
+  
+  components.push({
+    type: ComponentType.ACTION_ROW,
+    components: [
+      {
+        type: ComponentType.BUTTON,
+        style: ButtonStyle.SECONDARY,
+        label: t.back,
+        emoji: { name: '◀️' },
+        custom_id: `settings_roles_${guildId}`
+      }
+    ]
+  });
+
+  return new Response(JSON.stringify({
+    type: InteractionResponseType.UPDATE_MESSAGE,
+    data: {
+      embeds: [embed],
+      components
+    }
+  }), {
+    headers: { 'Content-Type': 'application/json' }
+  });
+}
+
+async function handleStoreRoleSelection(
+  interaction: any,
+  env: Env,
+  action: string,
+  guildId: string
+): Promise<Response> {
+  // action kann 'menu' oder der store-name sein
+  if (action === 'menu') {
+    const store = interaction.data.custom_id.split('_')[4] as StoreType;
+    return showStoreRoleMenu(interaction, env, guildId, store);
+  }
+  
+  // Wenn eine Rolle ausgewählt wurde
+  const selectedValue = interaction.data.values?.[0];
+  if (!selectedValue) {
+    return respondWithEmbed({
+      title: '❌ Error',
+      description: 'No role selected',
+      color: 0xff5555
+    }, true);
+  }
+  
+  const store = action as StoreType;
+  const roleId = selectedValue.replace('role_', '');
+  
+  const config = await getGuildConfig(env, guildId);
+  if (!config) {
+    return respondWithEmbed({
+      title: '❌ Error',
+      description: 'Configuration not found',
+      color: 0xff5555
+    }, true);
+  }
+  
+  if (!config.storeRoles) {
+    config.storeRoles = {};
+  }
+  
+  config.storeRoles[store] = roleId;
+  await env.GUILD_CONFIGS.put(guildId, JSON.stringify(config));
+  
+  return handleConfigureStoreRoles(interaction, env, guildId);
+}
+
+async function showStoreRoleMenu(
+  interaction: any,
+  env: Env,
+  guildId: string,
+  store: StoreType
+): Promise<Response> {
+  const config = await getGuildConfig(env, guildId);
+  if (!config) {
+    return respondWithEmbed({
+      title: '❌ Error',
+      description: 'Configuration not found',
+      color: 0xff5555
+    }, true);
+  }
+  
+  const t = translations[config.language];
+  const roles = await fetchGuildRoles(env, guildId);
+  
+  const embed = {
+    title: `${getStoreEmoji(store)} ${storeNames[store]} - ${t.settings_store_roles}`,
+    description: `Select a role to be mentioned for ${storeNames[store]} free games.`,
+    color: storeColors[store],
+    fields: [
+      {
+        name: '📋 ' + t.current_status,
+        value: config.storeRoles?.[store] 
+          ? `<@&${config.storeRoles[store]}>` 
+          : t.none,
+        inline: false
+      }
+    ],
+    footer: { text: 'PixelPost • Store Role Settings' }
+  };
+
+  const components = [];
+  
+  if (roles && roles.length > 0) {
+    const roleOptions = roles
+      .filter(role => role.name !== '@everyone' && !role.managed)
+      .slice(0, 25)
+      .map(role => ({
+        label: role.name.length > 100 ? role.name.substring(0, 97) + '...' : role.name,
+        value: `role_${role.id}`,
+        description: `Role ID: ${role.id}`,
+        emoji: { name: '👥' },
+        default: config.storeRoles?.[store] === role.id
+      }));
+
+    if (roleOptions.length > 0) {
+      components.push({
+        type: ComponentType.ACTION_ROW,
+        components: [
+          {
+            type: ComponentType.SELECT_MENU,
+            custom_id: `select_store_role_${store}_${guildId}`,
+            placeholder: 'Choose a role...',
+            min_values: 1,
+            max_values: 1,
+            options: roleOptions
+          }
+        ]
+      });
+    }
+  }
+  
+  components.push({
+    type: ComponentType.ACTION_ROW,
+    components: [
+      {
+        type: ComponentType.BUTTON,
+        style: ButtonStyle.DANGER,
+        label: 'Remove Role',
+        emoji: { name: '🗑️' },
+        custom_id: `remove_store_role_${store}_${guildId}`,
+        disabled: !config.storeRoles?.[store]
+      },
+      {
+        type: ComponentType.BUTTON,
+        style: ButtonStyle.SECONDARY,
+        label: t.back,
+        emoji: { name: '◀️' },
+        custom_id: `configure_store_roles_${guildId}`
+      }
+    ]
+  });
+
+  return new Response(JSON.stringify({
+    type: InteractionResponseType.UPDATE_MESSAGE,
+    data: {
+      embeds: [embed],
+      components
+    }
+  }), {
+    headers: { 'Content-Type': 'application/json' }
+  });
+}
+
+async function handleRemoveStoreRole(
+  interaction: any,
+  env: Env,
+  store: StoreType,
+  guildId: string
+): Promise<Response> {
+  const config = await getGuildConfig(env, guildId);
+  if (!config) {
+    return respondWithEmbed({
+      title: '❌ Error',
+      description: 'Configuration not found',
+      color: 0xff5555
+    }, true);
+  }
+  
+  if (config.storeRoles && config.storeRoles[store]) {
+    delete config.storeRoles[store];
+    await env.GUILD_CONFIGS.put(guildId, JSON.stringify(config));
+  }
+  
+  return handleConfigureStoreRoles(interaction, env, guildId);
 }
 
 async function handleSetupComponent(
@@ -2226,6 +2632,32 @@ async function fetchGuildChannels(env: Env, guildId: string): Promise<any[]> {
     return await response.json();
   } catch (error) {
     console.error('Error fetching channels:', error);
+    return [];
+  }
+}
+
+/**
+ * Fetches all roles of a guild
+ * @param env - Cloudflare Worker Environment
+ * @param guildId - ID of the guild
+ * @returns Promise<any[]> - Array of role objects or empty array if error occurs
+ */
+async function fetchGuildRoles(env: Env, guildId: string): Promise<any[]> {
+  try {
+    const response = await fetch(`https://discord.com/api/v10/guilds/${guildId}/roles`, {
+      headers: {
+        'Authorization': `Bot ${env.DISCORD_BOT_TOKEN}`
+      }
+    });
+    
+    if (!response.ok) {
+      console.error('Error fetching guild roles:', await response.text());
+      return [];
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching roles:', error);
     return [];
   }
 }
