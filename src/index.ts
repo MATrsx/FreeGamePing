@@ -1016,6 +1016,9 @@ async function getFreeGamesForStore(store: StoreType): Promise<Game[] | null> {
     if (!response.ok) {
       console.error(`Error fetching ${store} games:`, response.status);
       return null;
+    } else if (response.status === 0) {
+        // Keine Spiele gefunden
+        return null;
     }
     
     const data: GamerPowerGame[] = await response.json();
