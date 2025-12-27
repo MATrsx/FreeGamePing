@@ -44,11 +44,11 @@ async function handleCommand(interaction: any, env: Env, ctx: ExecutionContext):
   const lang = config?.language || 'en';
   const t = translations[lang];
 
-  // Berechtigungsprüfung
+  // Permission check
   const hasAdminPermission = member?.permissions && 
     (BigInt(member.permissions) & BigInt(0x8)) === BigInt(0x8);
 
-  const adminCommands = ['setup', 'disable', 'stores', 'language', 'role', 'separate-threads', 'thread'];
+  const adminCommands = ['setup', 'check', 'settings'];
   
   if (adminCommands.includes(name) && !hasAdminPermission) {
     return respondWithEmbed({
@@ -71,22 +71,8 @@ async function handleCommand(interaction: any, env: Env, ctx: ExecutionContext):
     case 'check':
       return handleCheckCommand(interaction, env, ctx, config, lang);
       
-    case 'disable':
-      await disableGuild(env, guildId);
-      return respondWithEmbed({
-        title: '❌ ' + t.bot_disabled,
-        description: t.disabled,
-        color: 0xff5555
-      });
-      
-    case 'language':
-      return handleLanguageCommand(interaction, env, guildId, config);
-      
-    case 'stores':
-      return handleStoresCommand(interaction, env, guildId, config);
-      
-    case 'role':
-      return handleRoleCommand(interaction, env, guildId, config);
+    case 'settings':
+      return handleSettingsCommand(interaction, config, lang);
       
     default:
       return respondWithEmbed({
@@ -166,16 +152,749 @@ async function handleSetupCommand(interaction: any, env: Env, existingConfig: Gu
   });
 }
 
+async function handleSettingsCommand(
+  interaction: any,
+  config: GuildConfig | null,
+  lang: Language
+): Promise<Response> {
+  const t = translations[lang];
+  
+  if (!config || !config.enabled) {
+    return respondWithEmbed({
+      title: '❌ ' + t.status_inactive,
+      description: t.setup_required,
+      color: 0xff5555
+    }, true);
+  }
+  
+  const guildId = interaction.guild_id;
+  
+  const embed = {
+    title: '⚙️ ' + t.settings_title,
+    description: t.settings_description,
+    color: 0x5865F2,
+    fields: [
+      {
+        name: '🌍 ' + t.status_language,
+        value: `\`${config.language.toUpperCase()}\``,
+        inline: true
+      },
+      {
+        name: '💱 ' + t.settings_currency,
+        value: `\`${config.currency}\``,
+        inline: true
+      },
+      {
+        name: '📦 ' + t.status_stores,
+        value: config.stores.length > 0
+          ? config.stores.map(s => `${getStoreEmoji(s)} ${storeNames[s]}`).join('\n')
+          : t.none,
+        inline: true
+      },
+      {
+        name: '📢 ' + t.status_channel,
+        value: `<#${config.channelId}>`,
+        inline: true
+      },
+      {
+        name: '👥 ' + t.settings_notification_roles,
+        value: config.mentionRoles.length > 0
+          ? config.mentionRoles.map(r => `<@&${r}>`).join(', ')
+          : t.none,
+        inline: true
+      },
+      {
+        name: '🔥 ' + t.settings_reactions,
+        value: config.reactions ? '✅ ' + t.enabled : '❌ ' + t.disabled,
+        inline: true
+      },
+      {
+        name: '🎮 ' + t.settings_dlcs,
+        value: config.includeDLCs ? '✅ ' + t.settings_include_dlcs : '❌ ' + t.settings_games_only,
+        inline: true
+      }
+    ],
+    footer: { text: 'PixelPost • Settings' },
+    timestamp: new Date().toISOString()
+  };
+
+  const components = [
+    {
+      type: ComponentType.ACTION_ROW,
+      components: [
+        {
+          type: ComponentType.BUTTON,
+          style: ButtonStyle.PRIMARY,
+          label: t.settings_btn_general,
+          emoji: { name: '⚙️' },
+          custom_id: `settings_general_${guildId}`
+        },
+        {
+          type: ComponentType.BUTTON,
+          style: ButtonStyle.PRIMARY,
+          label: t.settings_btn_stores,
+          emoji: { name: '📦' },
+          custom_id: `settings_stores_${guildId}`
+        },
+        {
+          type: ComponentType.BUTTON,
+          style: ButtonStyle.PRIMARY,
+          label: t.settings_btn_language,
+          emoji: { name: '🌍' },
+          custom_id: `settings_language_${guildId}`
+        }
+      ]
+    },
+    {
+      type: ComponentType.ACTION_ROW,
+      components: [
+        {
+          type: ComponentType.BUTTON,
+          style: ButtonStyle.PRIMARY,
+          label: t.settings_btn_roles,
+          emoji: { name: '👥' },
+          custom_id: `settings_roles_${guildId}`
+        },
+        {
+          type: ComponentType.BUTTON,
+          style: ButtonStyle.PRIMARY,
+          label: t.settings_btn_channel,
+          emoji: { name: '📢' },
+          custom_id: `settings_channel_${guildId}`
+        },
+        {
+          type: ComponentType.BUTTON,
+          style: ButtonStyle.PRIMARY,
+          label: t.settings_btn_reactions,
+          emoji: { name: '🔥' },
+          custom_id: `settings_reactions_${guildId}`
+        }
+      ]
+    }
+  ];
+
+  return new Response(JSON.stringify({
+    type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+    data: {
+      embeds: [embed],
+      components,
+      flags: 64
+    }
+  }), {
+    headers: { 'Content-Type': 'application/json' }
+  });
+}
+
+async function handleSettingsComponent(
+  interaction: any,
+  env: Env,
+  settingType: string,
+  guildId: string
+): Promise<Response> {
+  const config = await getGuildConfig(env, guildId);
+  if (!config) {
+    return respondWithEmbed({
+      title: '❌ Error',
+      description: 'Configuration not found',
+      color: 0xff5555
+    }, true);
+  }
+  
+  const t = translations[config.language];
+  
+  switch (settingType) {
+    case 'general':
+      return handleGeneralSettings(interaction, config, t, guildId);
+    case 'stores':
+      return handleStoresSettings(interaction, config, t, guildId);
+    case 'language':
+      return handleLanguageSettings(interaction, config, t, guildId);
+    case 'roles':
+      return handleRolesSettings(interaction, config, t, guildId);
+    case 'channel':
+      return handleChannelSettings(interaction, config, t, guildId, env);
+    case 'reactions':
+      return handleReactionsSettings(interaction, config, t, guildId, env);
+    default:
+      return respondWithEmbed({
+        title: '❌ Error',
+        description: 'Unknown setting type',
+        color: 0xff5555
+      }, true);
+  }
+}
+
+async function handleSettingUpdate(interaction: any, env: Env, parts: string[]): Promise<Response> {
+  const action = parts[0]; // 'set' or 'toggle'
+  const setting = parts[1];
+  const value = parts[2];
+  const guildId = parts[3] || parts[2];
+  
+  const config = await getGuildConfig(env, guildId);
+  if (!config) {
+    return respondWithEmbed({
+      title: '❌ Error',
+      description: 'Configuration not found',
+      color: 0xff5555
+    }, true);
+  }
+  
+  const t = translations[config.language];
+  
+  // Handle different setting updates
+  if (setting === 'currency') {
+    config.currency = value as Currency;
+    await env.GUILD_CONFIGS.put(guildId, JSON.stringify(config));
+    return handleGeneralSettings(interaction, config, t, guildId);
+  }
+  
+  if (setting === 'dlcs') {
+    config.includeDLCs = !config.includeDLCs;
+    await env.GUILD_CONFIGS.put(guildId, JSON.stringify(config));
+    return handleGeneralSettings(interaction, config, t, guildId);
+  }
+  
+  if (setting === 'store') {
+    const store = value as StoreType;
+    if (config.stores.includes(store)) {
+      config.stores = config.stores.filter(s => s !== store);
+    } else {
+      config.stores.push(store);
+    }
+    await env.GUILD_CONFIGS.put(guildId, JSON.stringify(config));
+    return handleStoresSettings(interaction, config, t, guildId);
+  }
+  
+  if (setting === 'lang') {
+    config.language = value as Language;
+    await env.GUILD_CONFIGS.put(guildId, JSON.stringify(config));
+    const newT = translations[config.language];
+    return handleLanguageSettings(interaction, config, newT, guildId);
+  }
+  
+  if (setting === 'reactions') {
+    config.reactions = !config.reactions;
+    await env.GUILD_CONFIGS.put(guildId, JSON.stringify(config));
+    return handleReactionsSettings(interaction, config, t, guildId, env);
+  }
+  
+  return respondWithEmbed({
+    title: '❌ Error',
+    description: 'Unknown setting',
+    color: 0xff5555
+  }, true);
+}
+
+async function handleChannelSelection(interaction: any, env: Env, guildId: string): Promise<Response> {
+  const selectedValue = interaction.data.values?.[0];
+  if (!selectedValue) {
+    return respondWithEmbed({
+      title: '❌ Error',
+      description: 'No channel selected',
+      color: 0xff5555
+    }, true);
+  }
+  
+  const channelId = selectedValue.replace('channel_', '');
+  const config = await getGuildConfig(env, guildId);
+  
+  if (!config) {
+    return respondWithEmbed({
+      title: '❌ Error',
+      description: 'Configuration not found',
+      color: 0xff5555
+    }, true);
+  }
+  
+  config.channelId = channelId;
+  await env.GUILD_CONFIGS.put(guildId, JSON.stringify(config));
+  
+  const t = translations[config.language];
+  return handleChannelSettings(interaction, config, t, guildId, env);
+}
+
+async function handleGeneralSettings(
+  interaction: any,
+  config: GuildConfig,
+  t: any,
+  guildId: string
+): Promise<Response> {
+  const embed = {
+    title: '⚙️ ' + t.settings_general_title,
+    description: t.settings_general_desc,
+    color: 0x5865F2,
+    fields: [
+      {
+        name: '💱 ' + t.settings_currency,
+        value: `Current: \`${config.currency}\``,
+        inline: false
+      },
+      {
+        name: '🎮 ' + t.settings_dlcs,
+        value: config.includeDLCs ? '✅ ' + t.settings_include_dlcs : '❌ ' + t.settings_games_only,
+        inline: false
+      }
+    ],
+    footer: { text: 'PixelPost • General Settings' }
+  };
+
+  const currencies = ['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CAD', 'CHF', 'CNY'];
+  const currencyButtons = currencies.map(curr => ({
+    type: ComponentType.BUTTON,
+    style: config.currency === curr ? ButtonStyle.SUCCESS : ButtonStyle.SECONDARY,
+    label: curr,
+    custom_id: `set_currency_${curr}_${guildId}`
+  }));
+
+  const components = [
+    {
+      type: ComponentType.ACTION_ROW,
+      components: currencyButtons.slice(0, 5)
+    },
+    {
+      type: ComponentType.ACTION_ROW,
+      components: currencyButtons.slice(5)
+    },
+    {
+      type: ComponentType.ACTION_ROW,
+      components: [
+        {
+          type: ComponentType.BUTTON,
+          style: config.includeDLCs ? ButtonStyle.SUCCESS : ButtonStyle.SECONDARY,
+          label: t.settings_toggle_dlcs,
+          emoji: { name: '🎮' },
+          custom_id: `toggle_dlcs_${guildId}`
+        },
+        {
+          type: ComponentType.BUTTON,
+          style: ButtonStyle.SECONDARY,
+          label: t.back,
+          emoji: { name: '◀️' },
+          custom_id: `settings_back_${guildId}`
+        }
+      ]
+    }
+  ];
+
+  return new Response(JSON.stringify({
+    type: InteractionResponseType.UPDATE_MESSAGE,
+    data: {
+      embeds: [embed],
+      components
+    }
+  }), {
+    headers: { 'Content-Type': 'application/json' }
+  });
+}
+
+async function handleStoresSettings(
+  interaction: any,
+  config: GuildConfig,
+  t: any,
+  guildId: string
+): Promise<Response> {
+  const embed = {
+    title: '📦 ' + t.settings_stores_title,
+    description: t.settings_stores_desc,
+    color: 0x5865F2,
+    fields: [
+      {
+        name: '📦 ' + t.selected,
+        value: config.stores.length > 0
+          ? config.stores.map(s => `${getStoreEmoji(s)} ${storeNames[s]}`).join('\n')
+          : t.none,
+        inline: false
+      }
+    ],
+    footer: { text: 'PixelPost • Store Settings' }
+  };
+
+  const storeButtons = [
+    { id: 'epic', name: 'Epic Games', emoji: '🎮' },
+    { id: 'steam', name: 'Steam', emoji: '🎯' },
+    { id: 'gog', name: 'GOG', emoji: '🐉' },
+    { id: 'itchio', name: 'Itch.io', emoji: '🎨' }
+  ];
+
+  const components = [
+    {
+      type: ComponentType.ACTION_ROW,
+      components: storeButtons.map(s => ({
+        type: ComponentType.BUTTON,
+        style: config.stores.includes(s.id as StoreType) ? ButtonStyle.SUCCESS : ButtonStyle.SECONDARY,
+        label: s.name,
+        emoji: { name: s.emoji },
+        custom_id: `toggle_store_${s.id}_${guildId}`
+      }))
+    },
+    {
+      type: ComponentType.ACTION_ROW,
+      components: [
+        {
+          type: ComponentType.BUTTON,
+          style: ButtonStyle.SECONDARY,
+          label: t.back,
+          emoji: { name: '◀️' },
+          custom_id: `settings_back_${guildId}`
+        }
+      ]
+    }
+  ];
+
+  return new Response(JSON.stringify({
+    type: InteractionResponseType.UPDATE_MESSAGE,
+    data: {
+      embeds: [embed],
+      components
+    }
+  }), {
+    headers: { 'Content-Type': 'application/json' }
+  });
+}
+
+async function handleLanguageSettings(
+  interaction: any,
+  config: GuildConfig,
+  t: any,
+  guildId: string
+): Promise<Response> {
+  const embed = {
+    title: '🌍 ' + t.settings_language_title,
+    description: t.settings_language_desc,
+    color: 0x5865F2,
+    fields: [
+      {
+        name: t.current_language,
+        value: `\`${config.language.toUpperCase()}\``,
+        inline: false
+      }
+    ],
+    footer: { text: 'PixelPost • Language Settings' }
+  };
+
+  const languageButtons = [
+    { id: 'en', label: 'English', emoji: '🇬🇧' },
+    { id: 'de', label: 'Deutsch', emoji: '🇩🇪' },
+    { id: 'fr', label: 'Français', emoji: '🇫🇷' },
+    { id: 'es', label: 'Español', emoji: '🇪🇸' },
+  ];
+
+  const languageButtons2 = [
+    { id: 'it', label: 'Italiano', emoji: '🇮🇹' },
+    { id: 'pt', label: 'Português', emoji: '🇵🇹' },
+    { id: 'ru', label: 'Русский', emoji: '🇷🇺' },
+    { id: 'pl', label: 'Polski', emoji: '🇵🇱' },
+  ];
+
+  const components = [
+    {
+      type: ComponentType.ACTION_ROW,
+      components: languageButtons.map(btn => ({
+        type: ComponentType.BUTTON,
+        style: config.language === btn.id ? ButtonStyle.SUCCESS : ButtonStyle.PRIMARY,
+        label: btn.label,
+        emoji: { name: btn.emoji },
+        custom_id: `set_lang_${btn.id}_${guildId}`
+      }))
+    },
+    {
+      type: ComponentType.ACTION_ROW,
+      components: languageButtons2.map(btn => ({
+        type: ComponentType.BUTTON,
+        style: config.language === btn.id ? ButtonStyle.SUCCESS : ButtonStyle.PRIMARY,
+        label: btn.label,
+        emoji: { name: btn.emoji },
+        custom_id: `set_lang_${btn.id}_${guildId}`
+      }))
+    },
+    {
+      type: ComponentType.ACTION_ROW,
+      components: [
+        {
+          type: ComponentType.BUTTON,
+          style: ButtonStyle.SECONDARY,
+          label: t.back,
+          emoji: { name: '◀️' },
+          custom_id: `settings_back_${guildId}`
+        }
+      ]
+    }
+  ];
+
+  return new Response(JSON.stringify({
+    type: InteractionResponseType.UPDATE_MESSAGE,
+    data: {
+      embeds: [embed],
+      components
+    }
+  }), {
+    headers: { 'Content-Type': 'application/json' }
+  });
+}
+
+async function handleRolesSettings(
+  interaction: any,
+  config: GuildConfig,
+  t: any,
+  guildId: string
+): Promise<Response> {
+  const embed = {
+    title: '👥 ' + t.settings_roles_title,
+    description: t.settings_roles_desc,
+    color: 0x5865F2,
+    fields: [
+      {
+        name: '👥 ' + t.settings_general_role,
+        value: config.mentionRoles.length > 0
+          ? config.mentionRoles.map(r => `<@&${r}>`).join(', ')
+          : t.none,
+        inline: false
+      }
+    ],
+    footer: { text: 'PixelPost • Role Settings' }
+  };
+
+  // Add store-specific roles if configured
+  if (config.storeRoles && Object.keys(config.storeRoles).length > 0) {
+    const storeRolesText = Object.entries(config.storeRoles)
+      .map(([store, roleId]) => `${getStoreEmoji(store as StoreType)} ${storeNames[store as StoreType]}: <@&${roleId}>`)
+      .join('\n');
+    
+    embed.fields.push({
+      name: '📦 ' + t.settings_store_roles,
+      value: storeRolesText,
+      inline: false
+    });
+  }
+
+  const components = [
+    {
+      type: ComponentType.ACTION_ROW,
+      components: [
+        {
+          type: ComponentType.BUTTON,
+          style: ButtonStyle.SUCCESS,
+          label: t.settings_add_general_role,
+          emoji: { name: '➕' },
+          custom_id: `add_general_role_${guildId}`
+        },
+        {
+          type: ComponentType.BUTTON,
+          style: ButtonStyle.DANGER,
+          label: t.settings_clear_general_roles,
+          emoji: { name: '🗑️' },
+          custom_id: `clear_general_roles_${guildId}`,
+          disabled: config.mentionRoles.length === 0
+        }
+      ]
+    },
+    {
+      type: ComponentType.ACTION_ROW,
+      components: [
+        {
+          type: ComponentType.BUTTON,
+          style: ButtonStyle.PRIMARY,
+          label: t.settings_configure_store_roles,
+          emoji: { name: '📦' },
+          custom_id: `configure_store_roles_${guildId}`
+        },
+        {
+          type: ComponentType.BUTTON,
+          style: ButtonStyle.SECONDARY,
+          label: t.back,
+          emoji: { name: '◀️' },
+          custom_id: `settings_back_${guildId}`
+        }
+      ]
+    }
+  ];
+
+  return new Response(JSON.stringify({
+    type: InteractionResponseType.UPDATE_MESSAGE,
+    data: {
+      embeds: [embed],
+      components
+    }
+  }), {
+    headers: { 'Content-Type': 'application/json' }
+  });
+}
+
+async function handleChannelSettings(
+  interaction: any,
+  config: GuildConfig,
+  t: any,
+  guildId: string,
+  env: Env
+): Promise<Response> {
+  const channels = await fetchGuildChannels(env, guildId);
+  
+  const embed = {
+    title: '📢 ' + t.settings_channel_title,
+    description: t.settings_channel_desc,
+    color: 0x5865F2,
+    fields: [
+      {
+        name: t.current_channel,
+        value: `<#${config.channelId}>`,
+        inline: false
+      }
+    ],
+    footer: { text: 'PixelPost • Channel Settings' }
+  };
+
+  const components = [];
+  
+  // Dropdown for Channel selection
+  if (channels && channels.length > 0) {
+    const channelOptions = channels
+      .filter(ch => ch.type === 0 || ch.type === 5 || ch.type === 15)
+      .slice(0, 25)
+      .map(ch => ({
+        label: getChannelLabel(ch),
+        value: `channel_${ch.id}`,
+        description: getChannelDescription(ch),
+        emoji: getChannelEmoji(ch),
+        default: ch.id === config.channelId
+      }));
+
+    if (channelOptions.length > 0) {
+      components.push({
+        type: ComponentType.ACTION_ROW,
+        components: [
+          {
+            type: ComponentType.SELECT_MENU,
+            custom_id: `select_channel_${guildId}`,
+            placeholder: t.select_channel_placeholder || 'Choose a channel...',
+            min_values: 1,
+            max_values: 1,
+            options: channelOptions
+          }
+        ]
+      });
+    }
+  }
+  
+  components.push({
+    type: ComponentType.ACTION_ROW,
+    components: [
+      {
+        type: ComponentType.BUTTON,
+        style: ButtonStyle.SECONDARY,
+        label: t.back,
+        emoji: { name: '◀️' },
+        custom_id: `settings_back_${guildId}`
+      }
+    ]
+  });
+
+  return new Response(JSON.stringify({
+    type: InteractionResponseType.UPDATE_MESSAGE,
+    data: {
+      embeds: [embed],
+      components
+    }
+  }), {
+    headers: { 'Content-Type': 'application/json' }
+  });
+}
+
+async function handleReactionsSettings(
+  interaction: any,
+  config: GuildConfig,
+  t: any,
+  guildId: string,
+  env: Env
+): Promise<Response> {
+  const embed = {
+    title: '🔥 ' + t.settings_reactions_title,
+    description: t.settings_reactions_desc,
+    color: 0x5865F2,
+    fields: [
+      {
+        name: t.current_status,
+        value: config.reactions ? '✅ ' + t.enabled : '❌ ' + t.disabled,
+        inline: false
+      },
+      {
+        name: 'ℹ️ ' + t.info,
+        value: t.settings_reactions_info,
+        inline: false
+      }
+    ],
+    footer: { text: 'PixelPost • Reaction Settings' }
+  };
+
+  const components = [
+    {
+      type: ComponentType.ACTION_ROW,
+      components: [
+        {
+          type: ComponentType.BUTTON,
+          style: config.reactions ? ButtonStyle.DANGER : ButtonStyle.SUCCESS,
+          label: config.reactions ? t.disable : t.enable,
+          emoji: { name: config.reactions ? '❌' : '✅' },
+          custom_id: `toggle_reactions_${guildId}`
+        },
+        {
+          type: ComponentType.BUTTON,
+          style: ButtonStyle.SECONDARY,
+          label: t.back,
+          emoji: { name: '◀️' },
+          custom_id: `settings_back_${guildId}`
+        }
+      ]
+    }
+  ];
+
+  return new Response(JSON.stringify({
+    type: InteractionResponseType.UPDATE_MESSAGE,
+    data: {
+      embeds: [embed],
+      components
+    }
+  }), {
+    headers: { 'Content-Type': 'application/json' }
+  });
+}
+
 async function handleComponent(interaction: any, env: Env, ctx: ExecutionContext): Promise<Response> {
   const customId = interaction.data.custom_id;
   const parts = customId.split('_');
-  const action = parts[0];
-  const param = parts[1];
-  const guildId = parts[2];
-  const context = parts[3];
   
-  if (context === 'setup') {
-    return handleSetupComponent(interaction, env, action, param, guildId);
+  // Settings handlers
+  if (parts[0] === 'settings') {
+    const settingType = parts[1];
+    const guildId = parts[2];
+    
+    if (settingType === 'back') {
+      const config = await getGuildConfig(env, guildId);
+      if (!config) {
+        return respondWithEmbed({
+          title: '❌ Error',
+          description: 'Configuration not found',
+          color: 0xff5555
+        }, true);
+      }
+      return handleSettingsCommand(interaction, config, config.language);
+    }
+    
+    return handleSettingsComponent(interaction, env, settingType, guildId);
+  }
+  
+  // Setting value updates
+  if (parts[0] === 'set' || parts[0] === 'toggle') {
+    return handleSettingUpdate(interaction, env, parts);
+  }
+  
+  // Setup wizard handlers
+  if (parts.includes('setup')) {
+    return handleSetupComponent(interaction, env, parts[0], parts[1], parts[2]);
+  }
+  
+  // Channel selection
+  if (parts[0] === 'select' && parts[1] === 'channel') {
+    return handleChannelSelection(interaction, env, parts[2]);
   }
   
   return new Response(JSON.stringify({
@@ -208,7 +927,11 @@ async function handleSetupComponent(
         language,
         stores: ['epic', 'steam', 'gog', 'itchio'],
         mentionRoles: [],
-        separateThreads: false
+        separateThreads: false,
+        reactions: true,
+        currency: 'USD',
+        includeDLCs: true,
+        storeRoles: {}
       };
     } else {
       tempConfig.language = language;
@@ -805,13 +1528,30 @@ async function checkAndPostFreeGames(env: Env): Promise<void> {
         if (!games || games.length === 0) continue;
         
         for (const game of games) {
+          // Skip DLCs if not included in config
+          if (game.isDLC && !guild.includeDLCs) {
+            console.log(`⏭️ Skipping DLC: ${game.title} (DLCs disabled)`);
+            continue;
+          }
+
           const gameKey = `${store}-${game.id}`;
           
           if (!postedGames.includes(gameKey)) {
             console.log(`🆕 New free game: ${game.title} (${store})`);
             
-            const embed = createGameEmbed(game, t, guild.language);
-            const mentions = guild.mentionRoles.map(r => `<@&${r}>`).join(' ');
+            const embed = createGameEmbed(game, t, guild.language, guild.currency);
+            
+            // Get mentions based on config
+            let mentions = '';
+            
+            // Check for store-specific role first
+            if (guild.storeRoles && guild.storeRoles[store]) {
+              mentions = `<@&${guild.storeRoles[store]}>`;
+            } 
+            // Otherwise use general roles
+            else if (guild.mentionRoles.length > 0) {
+              mentions = guild.mentionRoles.map(r => `<@&${r}>`).join(' ');
+            }
             
             let targetId = guild.channelId;
             if (guild.separateThreads && guild.storeThreads?.[store]) {
@@ -843,7 +1583,7 @@ async function checkAndPostFreeGames(env: Env): Promise<void> {
   }
 }
 
-function createGameEmbed(game: Game, t: any, lang: Language): any {
+function createGameEmbed(game: Game, t: any, lang: Language, currency: Currency): any {
   const endTimestamp = Math.floor(new Date(game.endDate).getTime() / 1000);
   
   const embed: any = {
@@ -863,6 +1603,11 @@ function createGameEmbed(game: Game, t: any, lang: Language): any {
     embed.image = { url: game.image };
   }
   
+  // Add DLC badge if applicable
+  if (game.isDLC) {
+    embed.title = `🎁 ${game.title} - DLC - ${t.free_title}`;
+  }
+  
   embed.fields.push({
     name: t.available_until,
     value: `<t:${endTimestamp}:F> (<t:${endTimestamp}:R>)`,
@@ -870,9 +1615,10 @@ function createGameEmbed(game: Game, t: any, lang: Language): any {
   });
   
   if (game.price && game.price.original > 0) {
+    // Use the guild's preferred currency
     const priceFormatted = new Intl.NumberFormat(getLocaleForLanguage(lang), {
       style: 'currency',
-      currency: game.price.currency
+      currency: currency
     }).format(game.price.original);
     
     embed.fields.push({
@@ -1225,7 +1971,11 @@ async function saveGuildConfig(env: Env, guildId: string, channelId: string, thr
     stores: existing?.stores || ['epic', 'steam', 'gog', 'itchio'],
     mentionRoles: existing?.mentionRoles || [],
     separateThreads: existing?.separateThreads || false,
-    storeThreads: existing?.storeThreads || {}
+    storeThreads: existing?.storeThreads || {},
+    reactions: existing?.reactions !== undefined ? existing.reactions : true,
+    currency: existing?.currency || 'USD',
+    includeDLCs: existing?.includeDLCs !== undefined ? existing.includeDLCs : true,
+    storeRoles: existing?.storeRoles || {}
   };
   await env.GUILD_CONFIGS.put(guildId, JSON.stringify(config));
 }
@@ -1254,6 +2004,34 @@ async function updateStores(env: Env, guildId: string, stores: StoreType[]): Pro
   }
 }
 
+async function updateCurrency(env: Env, guildId: string, currency: Currency): Promise<void> {
+  const config = await getGuildConfig(env, guildId);
+  if (config) {
+    config.currency = currency;
+    await env.GUILD_CONFIGS.put(guildId, JSON.stringify(config));
+  }
+}
+
+async function toggleDLCs(env: Env, guildId: string): Promise<boolean> {
+  const config = await getGuildConfig(env, guildId);
+  if (config) {
+    config.includeDLCs = !config.includeDLCs;
+    await env.GUILD_CONFIGS.put(guildId, JSON.stringify(config));
+    return config.includeDLCs;
+  }
+  return false;
+}
+
+async function toggleReactions(env: Env, guildId: string): Promise<boolean> {
+  const config = await getGuildConfig(env, guildId);
+  if (config) {
+    config.reactions = !config.reactions;
+    await env.GUILD_CONFIGS.put(guildId, JSON.stringify(config));
+    return config.reactions;
+  }
+  return false;
+}
+
 async function addMentionRole(env: Env, guildId: string, roleId: string): Promise<void> {
   const config = await getGuildConfig(env, guildId);
   if (config && !config.mentionRoles.includes(roleId)) {
@@ -1266,6 +2044,41 @@ async function removeMentionRole(env: Env, guildId: string, roleId: string): Pro
   const config = await getGuildConfig(env, guildId);
   if (config) {
     config.mentionRoles = config.mentionRoles.filter(r => r !== roleId);
+    await env.GUILD_CONFIGS.put(guildId, JSON.stringify(config));
+  }
+}
+
+async function clearMentionRoles(env: Env, guildId: string): Promise<void> {
+  const config = await getGuildConfig(env, guildId);
+  if (config) {
+    config.mentionRoles = [];
+    await env.GUILD_CONFIGS.put(guildId, JSON.stringify(config));
+  }
+}
+
+async function setStoreRole(env: Env, guildId: string, store: StoreType, roleId: string): Promise<void> {
+  const config = await getGuildConfig(env, guildId);
+  if (config) {
+    if (!config.storeRoles) {
+      config.storeRoles = {};
+    }
+    config.storeRoles[store] = roleId;
+    await env.GUILD_CONFIGS.put(guildId, JSON.stringify(config));
+  }
+}
+
+async function removeStoreRole(env: Env, guildId: string, store: StoreType): Promise<void> {
+  const config = await getGuildConfig(env, guildId);
+  if (config && config.storeRoles) {
+    delete config.storeRoles[store];
+    await env.GUILD_CONFIGS.put(guildId, JSON.stringify(config));
+  }
+}
+
+async function updateChannel(env: Env, guildId: string, channelId: string): Promise<void> {
+  const config = await getGuildConfig(env, guildId);
+  if (config) {
+    config.channelId = channelId;
     await env.GUILD_CONFIGS.put(guildId, JSON.stringify(config));
   }
 }
@@ -1374,17 +2187,12 @@ async function getChannelInfo(env: Env, channelId: string): Promise<any> {
  */
 function getChannelLabel(channel: any): string {
   let label = channel.name;
-  
-  // Füge Parent-Kategorie hinzu wenn vorhanden
   if (channel.parent_id) {
     label = `📁 ${label}`;
   }
-  
-  // Kürze zu lange Namen
   if (label.length > 100) {
     label = label.substring(0, 97) + '...';
   }
-  
   return label;
 }
 
@@ -1500,6 +2308,52 @@ async function proceedToStoreSelection(tempConfig: GuildConfig, env: Env, guildI
 }
 
 // ============================================================================
+// COOLDOWN MANAGEMENT
+// ============================================================================
+
+const COOLDOWN_DURATION = 60 * 60 * 1000; // 1 hour in milliseconds
+
+async function checkCooldown(env: Env, guildId: string): Promise<{ onCooldown: boolean; remainingTime?: number }> {
+  const cooldownKey = `check_${guildId}`;
+  const lastCheck = await env.COMMAND_COOLDOWNS.get(cooldownKey);
+  
+  if (!lastCheck) {
+    return { onCooldown: false };
+  }
+  
+  const lastCheckTime = parseInt(lastCheck);
+  const now = Date.now();
+  const timePassed = now - lastCheckTime;
+  
+  if (timePassed < COOLDOWN_DURATION) {
+    const remainingTime = COOLDOWN_DURATION - timePassed;
+    return { onCooldown: true, remainingTime };
+  }
+  
+  return { onCooldown: false };
+}
+
+async function setCooldown(env: Env, guildId: string): Promise<void> {
+  const cooldownKey = `check_${guildId}`;
+  await env.COMMAND_COOLDOWNS.put(cooldownKey, Date.now().toString(), {
+    expirationTtl: Math.ceil(COOLDOWN_DURATION / 1000)
+  });
+}
+
+function formatCooldownTime(ms: number): string {
+  const minutes = Math.ceil(ms / 60000);
+  if (minutes < 60) {
+    return `${minutes} minute${minutes !== 1 ? 's' : ''}`;
+  }
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  if (remainingMinutes === 0) {
+    return `${hours} hour${hours !== 1 ? 's' : ''}`;
+  }
+  return `${hours} hour${hours !== 1 ? 's' : ''} ${remainingMinutes} minute${remainingMinutes !== 1 ? 's' : ''}`;
+}
+
+// ============================================================================
 // UTILITY FUNCTIONS
 // ============================================================================
 
@@ -1529,6 +2383,7 @@ import { verifyKey } from 'discord-interactions';
 interface Env {
   POSTED_GAMES: KVNamespace;
   GUILD_CONFIGS: KVNamespace;
+  COMMAND_COOLDOWNS: KVNamespace;
   DISCORD_PUBLIC_KEY: string;
   DISCORD_BOT_TOKEN: string;
   DISCORD_APPLICATION_ID: string;
@@ -1536,6 +2391,7 @@ interface Env {
 
 type StoreType = 'epic' | 'steam' | 'gog' | 'itchio';
 type Language = 'en' | 'de' | 'fr' | 'es' | 'it' | 'pt' | 'ru' | 'pl';
+type Currency = 'USD' | 'EUR' | 'GBP' | 'JPY' | 'AUD' | 'CAD' | 'CHF' | 'CNY' | 'RUB' | 'BRL';
 
 interface GuildConfig {
   guildId: string;
@@ -1544,11 +2400,13 @@ interface GuildConfig {
   enabled: boolean;
   language: Language;
   stores: StoreType[];
-  mentionRoles: string[];
+  mentionRoles: string[]; // General notification role
+  storeRoles?: { [key in StoreType]?: string }; // Store-specific roles
   separateThreads: boolean;
-  storeThreads?: {
-    [key in StoreType]?: string;
-  };
+  storeThreads?: { [key in StoreType]?: string };
+  reactions: boolean; // Enable/disable reaction voting
+  currency: Currency;
+  includeDLCs: boolean; // Include DLCs or only games
 }
 
 interface Game {
@@ -1570,6 +2428,7 @@ interface Game {
     count: number;
   };
   instructions?: string;
+  isDLC?: boolean;
 }
 
 interface GamerPowerGame {
@@ -1659,7 +2518,7 @@ const storeNames: Record<StoreType, string> = {
 };
 
 const storeColors: Record<StoreType, number> = {
-  epic: 0x121212,
+  epic: 0x2B2D31,
   steam: 0x66C0F4,
   gog: 0xC10DE4,
   itchio: 0xDE425C
